@@ -22,6 +22,8 @@ Press Ctrl+C to stop. See [usage](docs/usage.md) for more options.
 
 ## Declarative configuration with Nix
 
+Add `inputs.rxwpe.homeManagerModules.default` to your imports / module list. Here's an example configuration.
+
 ```nix
 {
   imports = [ inputs.rxwpe.homeManagerModules.default ];
