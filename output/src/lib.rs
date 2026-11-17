@@ -13,14 +13,6 @@ mod wayland_runner;
 mod window;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub enum Backend {
-    #[default]
-    Window,
-    Wayland,
-    Macos,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
 pub enum ScaleMode {
     Fit,
     #[default]
@@ -30,7 +22,7 @@ pub enum ScaleMode {
 
 #[derive(Debug, Clone)]
 pub struct OutputOptions {
-    pub backend: Backend,
+    pub window: bool,
     pub width: u32,
     pub height: u32,
     pub fps: u32,
@@ -42,7 +34,7 @@ pub struct OutputOptions {
 impl Default for OutputOptions {
     fn default() -> Self {
         Self {
-            backend: Backend::Window,
+            window: false,
             width: 1280,
             height: 720,
             fps: 30,
@@ -60,17 +52,19 @@ where
     if options.width == 0 || options.height == 0 || options.fps == 0 {
         bail!("output dimensions and frame rate must be greater than zero");
     }
-    match options.backend {
-        Backend::Window => window::run(options, render),
-        #[cfg(target_os = "macos")]
-        Backend::Macos => macos::run(options, render),
-        #[cfg(not(target_os = "macos"))]
-        Backend::Macos => bail!("macOS output is only supported on macOS"),
-        #[cfg(target_os = "linux")]
-        Backend::Wayland => wayland_runner::run(options, render),
-        #[cfg(not(target_os = "linux"))]
-        Backend::Wayland => bail!("Wayland output is only supported on Linux"),
+    if options.window {
+        return window::run(options, render);
     }
+    #[cfg(target_os = "macos")]
+    {
+        macos::run(options, render)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        wayland_runner::run(options, render)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    bail!("desktop playback requires Linux with Wayland or macOS; use --window for a preview")
 }
 
 pub(crate) struct Presenter<'a> {

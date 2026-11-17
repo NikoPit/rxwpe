@@ -17,7 +17,7 @@ Without Nix, install Rust and FFmpeg before running the commands below.
 Try the included example in a window:
 
 ```sh
-cargo run -- play examples/static-scene
+cargo run -- play examples/static-scene --window
 ```
 
 Press Escape or close the window to stop.
@@ -26,7 +26,7 @@ You can also build and run with Nix:
 
 ```sh
 nix build
-nix run . -- play examples/static-scene
+nix run . -- play examples/static-scene --window
 ```
 
 ## Play a wallpaper
@@ -59,22 +59,22 @@ cargo run -- play /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
 
 ## Set the desktop wallpaper
 
-On macOS:
+Playback automatically uses your desktop on macOS or Linux with a Wayland compositor that supports layer-shell:
 
 ```sh
-cargo run -- play /path/to/wallpaper --output macos
+cargo run -- play /path/to/wallpaper
 ```
 
 To choose a display on macOS, use its name or index, starting at zero:
 
 ```sh
-cargo run -- play /path/to/wallpaper --output macos --display 0
+cargo run -- play /path/to/wallpaper --display 0
 ```
 
-On a Wayland desktop that supports layer-shell, use `wayland`. To choose a display, pass its name:
+On Wayland, choose a display by name:
 
 ```sh
-cargo run -- play /path/to/wallpaper --output wayland --display DP-1
+cargo run -- play /path/to/wallpaper --display DP-1
 ```
 
 Each process displays one wallpaper on one display. Press Ctrl+C in the terminal to stop.
@@ -94,7 +94,7 @@ cargo run -- play /path/to/wallpaper --scale fit --fps 30
 Set the initial window size:
 
 ```sh
-cargo run -- play /path/to/wallpaper --size 1280x720
+cargo run -- play /path/to/wallpaper --window --size 1280x720
 ```
 
 Override an option defined by the wallpaper:
@@ -103,31 +103,11 @@ Override an option defined by the wallpaper:
 cargo run -- play examples/static-scene --property opacity=0.5
 ```
 
-Inspect a wallpaper to see its available options:
-
-```sh
-cargo run -- inspect /path/to/wallpaper
-```
-
 Unsupported scene behavior prevents playback by default. To preview the supported parts:
 
 ```sh
 cargo run -- play /path/to/wallpaper --allow-partial
 ```
-
-## Save a screenshot
-
-```sh
-cargo run -- screenshot /path/to/wallpaper --output wallpaper.png
-```
-
-Choose a position in a video, in seconds:
-
-```sh
-cargo run -- screenshot /path/to/video-wallpaper --time 3.5 --output wallpaper.png
-```
-
-Screenshots do not change your desktop wallpaper.
 
 ## Command help
 

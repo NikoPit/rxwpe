@@ -5,7 +5,7 @@ use std::{path::PathBuf, time::Duration};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use rxwpe_gpu::{Frame, Gpu};
-use rxwpe_output::{Backend, OutputOptions, ScaleMode};
+use rxwpe_output::{OutputOptions, ScaleMode};
 use rxwpe_parser::{Project, WallpaperType};
 use rxwpe_scene::{SceneOptions, ScenePlayer};
 use rxwpe_video::VideoPlayer;
@@ -14,7 +14,8 @@ use rxwpe_video::VideoPlayer;
 #[command(
     name = "rxwpe",
     version,
-    about = "Play Wallpaper Engine projects with Rust and wgpu"
+    about = "Play Wallpaper Engine wallpapers",
+    disable_help_subcommand = true
 )]
 struct Args {
     #[command(subcommand)]
@@ -58,19 +59,13 @@ impl ProjectArgs {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Inspect metadata, scene references, and unsupported scene behavior.
-    Inspect {
-        #[command(flatten)]
-        project: ProjectArgs,
-        #[arg(long)]
-        list_assets: bool,
-    },
-    /// Play a wallpaper in a window or on the desktop.
+    /// Play a wallpaper on the desktop.
     Play {
         #[command(flatten)]
         project: ProjectArgs,
-        #[arg(long, value_enum, default_value = "window")]
-        output: OutputKind,
+        /// Preview in a normal window instead of setting the desktop wallpaper.
+        #[arg(long)]
+        window: bool,
         #[arg(long, default_value = "1280x720", value_parser = parse_size)]
         size: (u32, u32),
         #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u32).range(1..=240))]
@@ -84,25 +79,6 @@ enum Command {
         #[arg(long)]
         allow_partial: bool,
     },
-    /// Render one frame to a PNG without changing the desktop.
-    Screenshot {
-        #[command(flatten)]
-        project: ProjectArgs,
-        #[arg(short, long)]
-        output: PathBuf,
-        /// Video position in seconds.
-        #[arg(long, default_value_t = 0.0, value_parser = parse_time)]
-        time: f64,
-        #[arg(long)]
-        allow_partial: bool,
-    },
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum OutputKind {
-    Window,
-    Wayland,
-    Macos,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -157,36 +133,9 @@ fn main() {
 
 fn run() -> Result<()> {
     match Args::parse().command {
-        Command::Inspect {
-            project,
-            list_assets,
-        } => {
-            let project = project.load()?;
-            println!("{}", serde_json::to_string_pretty(&project.metadata)?);
-            if project.metadata.kind == WallpaperType::Scene {
-                let scene = project.scene()?;
-                println!(
-                    "Scene: {}x{}, {} image layers",
-                    scene.width,
-                    scene.height,
-                    scene.images.len()
-                );
-                for layer in &scene.images {
-                    println!("  {}: {} [{}]", layer.id, layer.name, layer.texture);
-                }
-                for warning in scene.warnings {
-                    eprintln!("warning: {warning}");
-                }
-            }
-            if list_assets {
-                for path in project.assets.list()? {
-                    println!("{path}");
-                }
-            }
-        }
         Command::Play {
             project,
-            output,
+            window,
             size,
             fps,
             scale,
@@ -197,11 +146,7 @@ fn run() -> Result<()> {
             // Initialize a player lazily using the device selected for the output surface.
             let mut player = None;
             let options = OutputOptions {
-                backend: match output {
-                    OutputKind::Window => Backend::Window,
-                    OutputKind::Wayland => Backend::Wayland,
-                    OutputKind::Macos => Backend::Macos,
-                },
+                window,
                 width: size.0,
                 height: size.1,
                 fps,
@@ -223,24 +168,6 @@ fn run() -> Result<()> {
                     .render(gpu, Duration::from_secs_f64(elapsed))
             })?;
         }
-        Command::Screenshot {
-            project,
-            output,
-            time,
-            allow_partial,
-        } => {
-            let project = project.load()?;
-            let gpu = Gpu::headless()?;
-            let mut player = Player::open(&project, &gpu, allow_partial)?;
-            let frame = player.render(&gpu, Duration::from_secs_f64(time))?;
-            gpu.save_png(&frame, &output)?;
-            println!(
-                "Saved {}x{} frame to {}",
-                frame.width(),
-                frame.height(),
-                output.display()
-            );
-        }
     }
     Ok(())
 }
@@ -255,10 +182,32 @@ fn parse_size(input: &str) -> Result<(u32, u32), String> {
     Ok((width, height))
 }
 
-fn parse_time(input: &str) -> Result<f64, String> {
-    let seconds: f64 = input.parse().map_err(|_| "invalid timestamp")?;
-    if !seconds.is_finite() || !(0.0..=31_536_000.0).contains(&seconds) {
-        return Err("timestamp must be between 0 and 31536000 seconds".into());
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn playback_defaults_to_desktop_and_allows_window_preview() {
+        let args = Args::try_parse_from(["rxwpe", "play", "wallpaper"]).unwrap();
+        assert!(matches!(args.command, Command::Play { window: false, .. }));
+        let args = Args::try_parse_from(["rxwpe", "play", "wallpaper", "--window"]).unwrap();
+        assert!(matches!(args.command, Command::Play { window: true, .. }));
+        assert!(
+            Args::try_parse_from(["rxwpe", "play", "wallpaper", "--output", "wayland"]).is_err()
+        );
     }
-    Ok(seconds)
+
+    #[test]
+    fn play_is_the_only_command() {
+        let mut command = <Args as clap::CommandFactory>::command();
+        command.build();
+        let commands: Vec<_> = command
+            .get_subcommands()
+            .map(|cmd| cmd.get_name())
+            .collect();
+        assert_eq!(commands, ["play"]);
+        for removed in ["inspect", "screenshot", "help"] {
+            assert!(Args::try_parse_from(["rxwpe", removed]).is_err());
+        }
+    }
 }

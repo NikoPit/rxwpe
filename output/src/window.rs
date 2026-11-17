@@ -20,7 +20,7 @@ where
 {
     let mut builder = EventLoop::builder();
     #[cfg(target_os = "macos")]
-    if matches!(options.backend, super::Backend::Macos) {
+    if !options.window {
         super::macos::configure_event_loop(&mut builder);
     }
     let event_loop = builder.build().context("create window event loop")?;
@@ -62,7 +62,7 @@ where
 {
     fn initialize(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
         #[cfg(target_os = "macos")]
-        let desktop = matches!(self.options.backend, super::Backend::Macos);
+        let desktop = !self.options.window;
         #[cfg(target_os = "macos")]
         let window = if desktop {
             let (window, display) = super::macos::create_desktop_window(event_loop, &self.options)?;
