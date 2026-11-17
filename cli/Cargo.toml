@@ -1,0 +1,19 @@
+[package]
+name = "rxwpe-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "rxwpe"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+rxwpe-parser.workspace = true
+rxwpe-scene.workspace = true
+rxwpe-video.workspace = true
+rxwpe-web.workspace = true
+rxwpe-gpu.workspace = true
+rxwpe-output.workspace = true

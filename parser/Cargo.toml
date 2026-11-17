@@ -1,0 +1,12 @@
+[package]
+name = "rxwpe-parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+image.workspace = true
+lz4_flex.workspace = true
+rxwpe-assets = { path = "../assets" }

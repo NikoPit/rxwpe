@@ -1,0 +1,10 @@
+{
+  "passes": [{
+    "shader": "genericimage2",
+    "blending": "translucent",
+    "cullmode": "nocull",
+    "depthtest": "disabled",
+    "depthwrite": "disabled",
+    "textures": ["textures/checker.ppm"]
+  }]
+}
