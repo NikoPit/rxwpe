@@ -3,51 +3,27 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-      eachSystem = nixpkgs.lib.genAttrs systems;
-      runtimeLibraries = pkgs: with pkgs; lib.optionals stdenv.hostPlatform.isLinux [
-        vulkan-loader
-        libGL
-        wayland
-        libxkbcommon
-        libx11
-        libxcursor
-        libxi
-        libxrandr
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
       ];
-    in {
-      packages = eachSystem (system:
-        let pkgs = import nixpkgs { inherit system; };
-        in {
-          default = pkgs.rustPlatform.buildRustPackage {
-            pname = "rxwpe";
-            version = "0.1.0";
-            src = pkgs.lib.cleanSourceWith {
-              src = ./.;
-              filter = path: type:
-                pkgs.lib.cleanSourceFilter path type
-                && !(builtins.elem (baseNameOf path) [ "target" "result" ]);
-            };
-            cargoLock.lockFile = ./Cargo.lock;
-            cargoBuildFlags = [ "--workspace" ];
-            cargoTestFlags = [ "--workspace" ];
-            nativeBuildInputs = [ pkgs.pkg-config pkgs.makeWrapper ];
-            nativeCheckInputs = [ pkgs.ffmpeg ];
-            postFixup = ''
-              wrapProgram $out/bin/rxwpe \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.ffmpeg ]} ${
-                  pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux
-                    "--prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath (runtimeLibraries pkgs)}"
-                }
-            '';
-            meta = {
-              mainProgram = "rxwpe";
-              platforms = systems;
-            };
-          };
-        });
+      eachSystem = nixpkgs.lib.genAttrs systems;
+    in
+    {
+      packages = eachSystem (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        rec {
+          rxwpe = pkgs.callPackage ./nix/package.nix { };
+          default = rxwpe;
+        }
+      );
 
       apps = eachSystem (system: {
         default = {
@@ -56,14 +32,21 @@
         };
       });
 
-      devShells = eachSystem (system:
-        let pkgs = import nixpkgs { inherit system; };
-        in {
-          default = pkgs.mkShell ({
-            packages = with pkgs; [ cargo rustc rustfmt clippy pkg-config ffmpeg ];
-          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (runtimeLibraries pkgs);
-          });
-        });
+      devShells = eachSystem (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = pkgs.callPackage ./nix/dev-shell.nix { };
+        }
+      );
+
+      formatter = eachSystem (system: nixpkgs.legacyPackages.${system}.nixfmt-tree);
+
+      homeManagerModules = {
+        default = ./nix/home-manager.nix;
+      };
+
     };
 }

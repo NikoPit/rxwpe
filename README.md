@@ -109,6 +109,30 @@ Unsupported scene behavior prevents playback by default. To preview the supporte
 cargo run -- /path/to/wallpaper --allow-partial
 ```
 
+## Declarative configuration
+
+Import `inputs.rxwpe.homeManagerModules.default` in your Home Manager configuration. It works with standalone Home Manager and Home Manager inside NixOS or nix-darwin.
+
+```nix
+{
+  imports = [ inputs.rxwpe.homeManagerModules.default ];
+
+  services.rxwpe = {
+    enable = true;
+    settings = {
+      wallpaper = "123456789";
+      fps = 60;
+    };
+  };
+}
+```
+
+Leave `display` unset to use the primary display on macOS or let the compositor choose on Wayland. To select a display, set `display = "DP-1"` on Wayland or use a display name or index such as `display = "0"` on macOS.
+
+Leave `fps` and `scale` unset, or set them to `null`, to use the command-line defaults.
+
+`settings.wallpaper` accepts a directory or a Workshop ID. You can also set `assets`, `steamLibraries`, `size`, `scale`, `properties`, `allowPartial`, and `extraArgs` inside `settings`. The wallpaper starts with your graphical session. Set `services.rxwpe.enable = false` to disable it.
+
 ## Command help
 
 ```sh
