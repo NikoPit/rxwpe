@@ -16,6 +16,8 @@ Play an already-downloaded Steam Workshop wallpaper using its ID:
 rxwpe 123456789
 ```
 
+Open the wallpaper's Steam Workshop page and copy the number after `?id=` in its URL. For example, `https://steamcommunity.com/sharedfiles/filedetails/?id=123456789` has the ID `123456789`.
+
 Press Ctrl+C to stop. See [usage](docs/usage.md) for more options.
 
 ## Declarative configuration with Nix

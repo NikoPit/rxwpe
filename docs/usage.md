@@ -20,6 +20,14 @@ For an already-downloaded Steam Workshop wallpaper, pass its ID:
 rxwpe 123456789
 ```
 
+To find the ID, open the wallpaper's page in the Steam Workshop. In Steam, use the page's Share button to copy its link, or open the page in a browser. The number after `?id=` is the wallpaper ID:
+
+```text
+https://steamcommunity.com/sharedfiles/filedetails/?id=123456789
+```
+
+This wallpaper's ID is `123456789`.
+
 rxwpe does not download wallpapers. Download Workshop wallpapers through Steam first.
 
 Specify additional Steam libraries with `--steam-library`. This option can be repeated:
