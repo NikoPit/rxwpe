@@ -1650,6 +1650,8 @@ name = "rxwpe-output"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "objc2",
+ "objc2-app-kit",
  "pollster",
  "raw-window-handle",
  "rxwpe-gpu",

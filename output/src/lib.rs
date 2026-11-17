@@ -4,6 +4,8 @@ use anyhow::{Context, Result, bail};
 use rxwpe_gpu::{Blend, Compositor, Frame, Gpu, Layer};
 use std::sync::Arc;
 
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(target_os = "linux")]
 mod wayland;
 #[cfg(target_os = "linux")]
@@ -15,6 +17,7 @@ pub enum Backend {
     #[default]
     Window,
     Wayland,
+    Macos,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -59,6 +62,10 @@ where
     }
     match options.backend {
         Backend::Window => window::run(options, render),
+        #[cfg(target_os = "macos")]
+        Backend::Macos => macos::run(options, render),
+        #[cfg(not(target_os = "macos"))]
+        Backend::Macos => bail!("macOS output is only supported on macOS"),
         #[cfg(target_os = "linux")]
         Backend::Wayland => wayland_runner::run(options, render),
         #[cfg(not(target_os = "linux"))]

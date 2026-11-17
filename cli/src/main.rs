@@ -65,7 +65,7 @@ enum Command {
         #[arg(long)]
         list_assets: bool,
     },
-    /// Play a wallpaper in a window or a Wayland desktop layer.
+    /// Play a wallpaper in a window or on the desktop.
     Play {
         #[command(flatten)]
         project: ProjectArgs,
@@ -77,7 +77,7 @@ enum Command {
         fps: u32,
         #[arg(long, value_enum, default_value = "fill")]
         scale: Scaling,
-        /// Wayland output name, such as DP-1. Defaults to the first output.
+        /// Display name, or a zero-based index on macOS. Defaults to the primary on macOS, compositor choice on Wayland.
         #[arg(long)]
         display: Option<String>,
         /// Preview supported scene layers while omitting unsupported behavior.
@@ -102,6 +102,7 @@ enum Command {
 enum OutputKind {
     Window,
     Wayland,
+    Macos,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -199,6 +200,7 @@ fn run() -> Result<()> {
                 backend: match output {
                     OutputKind::Window => Backend::Window,
                     OutputKind::Wayland => Backend::Wayland,
+                    OutputKind::Macos => Backend::Macos,
                 },
                 width: size.0,
                 height: size.1,

@@ -18,12 +18,19 @@ pub fn run<F>(options: OutputOptions, render: F) -> Result<()>
 where
     F: FnMut(&Gpu, f64, (u32, u32)) -> Result<Frame> + 'static,
 {
-    let event_loop = EventLoop::new().context("create window event loop")?;
+    let mut builder = EventLoop::builder();
+    #[cfg(target_os = "macos")]
+    if matches!(options.backend, super::Backend::Macos) {
+        super::macos::configure_event_loop(&mut builder);
+    }
+    let event_loop = builder.build().context("create window event loop")?;
     let mut app = App {
         options,
         render,
         window: None,
         presenter: None,
+        #[cfg(target_os = "macos")]
+        desktop_display: None,
         start: Instant::now(),
         next_frame: Instant::now(),
         error: None,
@@ -42,6 +49,8 @@ struct App<F> {
     render: F,
     window: Option<Arc<Window>>,
     presenter: Option<Presenter<'static>>,
+    #[cfg(target_os = "macos")]
+    desktop_display: Option<super::macos::DesktopDisplay>,
     start: Instant,
     next_frame: Instant,
     error: Option<anyhow::Error>,
@@ -52,18 +61,19 @@ where
     F: FnMut(&Gpu, f64, (u32, u32)) -> Result<Frame> + 'static,
 {
     fn initialize(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
-        let window = Arc::new(
-            event_loop
-                .create_window(
-                    Window::default_attributes()
-                        .with_title(&self.options.title)
-                        .with_inner_size(PhysicalSize::new(
-                            self.options.width,
-                            self.options.height,
-                        )),
-                )
-                .context("create wallpaper window")?,
-        );
+        #[cfg(target_os = "macos")]
+        let desktop = matches!(self.options.backend, super::Backend::Macos);
+        #[cfg(target_os = "macos")]
+        let window = if desktop {
+            let (window, display) = super::macos::create_desktop_window(event_loop, &self.options)?;
+            self.desktop_display = Some(display);
+            window
+        } else {
+            create_window(event_loop, &self.options)?
+        };
+        #[cfg(not(target_os = "macos"))]
+        let window = create_window(event_loop, &self.options)?;
+        let window = Arc::new(window);
         let size = window.inner_size();
         let instance = Arc::new(wgpu::Instance::new(&wgpu::InstanceDescriptor::default()));
         let surface = instance
@@ -77,6 +87,10 @@ where
             size.height,
             self.options.scale,
         )?);
+        #[cfg(target_os = "macos")]
+        if desktop {
+            super::macos::show_desktop_window(&window)?;
+        }
         self.window = Some(window);
         self.start = Instant::now();
         self.next_frame = self.start;
@@ -86,6 +100,16 @@ where
         self.error = Some(error);
         event_loop.exit();
     }
+}
+
+fn create_window(event_loop: &ActiveEventLoop, options: &OutputOptions) -> Result<Window> {
+    event_loop
+        .create_window(
+            Window::default_attributes()
+                .with_title(&options.title)
+                .with_inner_size(PhysicalSize::new(options.width, options.height)),
+        )
+        .context("create wallpaper window")
 }
 
 impl<F> ApplicationHandler for App<F>
@@ -135,6 +159,13 @@ where
         }
     }
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        #[cfg(target_os = "macos")]
+        if let (Some(display), Some(window)) = (&mut self.desktop_display, &self.window) {
+            if let Err(error) = display.refresh(event_loop, window) {
+                self.fail(event_loop, error);
+                return;
+            }
+        }
         if let Some(window) = self
             .window
             .as_ref()

@@ -1,16 +1,18 @@
 # rxwpe
 
-Play Wallpaper Engine wallpapers on Linux.
+Play Wallpaper Engine wallpapers on Linux and macOS.
 
 Currently supports basic image scenes and muted video playback. Web wallpapers and advanced scene effects are not supported yet.
 
 ## Get started
 
-With Nix installed, enter the development environment:
+On Linux or Apple Silicon macOS with Nix installed, enter the development environment:
 
 ```sh
 nix develop
 ```
+
+Without Nix, install Rust and FFmpeg before running the commands below.
 
 Try the included example in a window:
 
@@ -57,19 +59,27 @@ cargo run -- play /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
 
 ## Set the desktop wallpaper
 
-On a Wayland desktop that supports layer-shell:
+On macOS:
 
 ```sh
-cargo run -- play /path/to/wallpaper --output wayland
+cargo run -- play /path/to/wallpaper --output macos
 ```
 
-To choose a display:
+To choose a display on macOS, use its name or index, starting at zero:
+
+```sh
+cargo run -- play /path/to/wallpaper --output macos --display 0
+```
+
+On a Wayland desktop that supports layer-shell, use `wayland`. To choose a display, pass its name:
 
 ```sh
 cargo run -- play /path/to/wallpaper --output wayland --display DP-1
 ```
 
 Each process displays one wallpaper on one display. Press Ctrl+C in the terminal to stop.
+
+On macOS, playback stops if the selected display disconnects.
 
 ## Adjust playback
 

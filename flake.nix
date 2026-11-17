@@ -5,9 +5,9 @@
 
   outputs = { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       eachSystem = nixpkgs.lib.genAttrs systems;
-      runtimeLibraries = pkgs: with pkgs; [
+      runtimeLibraries = pkgs: with pkgs; lib.optionals stdenv.hostPlatform.isLinux [
         vulkan-loader
         libGL
         wayland
@@ -37,10 +37,15 @@
             nativeCheckInputs = [ pkgs.ffmpeg ];
             postFixup = ''
               wrapProgram $out/bin/rxwpe \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.ffmpeg ]} \
-                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath (runtimeLibraries pkgs)}
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.ffmpeg ]} ${
+                  pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux
+                    "--prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath (runtimeLibraries pkgs)}"
+                }
             '';
-            meta.mainProgram = "rxwpe";
+            meta = {
+              mainProgram = "rxwpe";
+              platforms = systems;
+            };
           };
         });
 
@@ -54,10 +59,11 @@
       devShells = eachSystem (system:
         let pkgs = import nixpkgs { inherit system; };
         in {
-          default = pkgs.mkShell {
+          default = pkgs.mkShell ({
             packages = with pkgs; [ cargo rustc rustfmt clippy pkg-config ffmpeg ];
+          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (runtimeLibraries pkgs);
-          };
+          });
         });
     };
 }

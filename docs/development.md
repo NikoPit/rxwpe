@@ -1,8 +1,8 @@
 # rxwpe
 
-用 Rust 播放 Wallpaper Engine 项目。GPU 后端使用 wgpu，桌面输出面向支持 `wlr-layer-shell` 的 Wayland 合成器。
+用 Rust 播放 Wallpaper Engine 项目。GPU 后端使用 wgpu，桌面输出支持 macOS AppKit，以及支持 `wlr-layer-shell` 的 Wayland 合成器。
 
-当前已实现项目目录和 PKG 加载、静态图片场景、静音视频播放、普通窗口、Wayland 桌面窗口及离屏截图。尚未完整兼容 Wallpaper Engine。
+当前已实现项目目录和 PKG 加载、静态图片场景、静音视频播放、普通窗口、Wayland 和 macOS 桌面窗口及离屏截图。尚未完整兼容 Wallpaper Engine。
 
 ## 运行
 
@@ -19,9 +19,15 @@ cargo run -- play examples/static-scene --output window
 cargo run -- play examples/static-scene --output wayland --display DP-1
 ```
 
-`--display` 可省略，由合成器选择输出。一个进程目前只创建一个输出窗口。普通窗口可以按 Escape 退出，桌面模式可以通过 Ctrl+C 停止。
+macOS 桌面壁纸使用独立的输出后端：
 
-Nix 也提供构建与运行入口：
+```sh
+cargo run -- play examples/static-scene --output macos --display 0
+```
+
+`--output` 接受 `window`、`wayland` 或 `macos`。`--display` 可省略，Wayland 由合成器选择输出，macOS 使用主显示器。macOS 接受显示器名称或从零开始的索引。一个进程目前只创建一个输出窗口。普通窗口可以按 Escape 退出，桌面模式可以通过 Ctrl+C 停止。
+
+Nix 在 Linux 和 Apple Silicon macOS 提供构建与运行入口。当前锁定的 nixpkgs 不再支持 Intel macOS，Intel Mac 可以通过 Cargo 构建。
 
 ```sh
 nix build
@@ -61,7 +67,7 @@ cargo run -- screenshot examples/static-scene --property opacity=0.5 --output /t
 | `shader` | shader include 展开、combo 和参数元数据读取 |
 | `media` | FFmpeg 视频解码、循环和跳转 |
 | `gpu` | 共享 wgpu 设备、纹理上传、图片合成和读回 |
-| `output` | 普通窗口、Wayland layer-shell、画面缩放和提交 |
+| `output` | 普通窗口、Wayland layer-shell、macOS AppKit 桌面窗口、画面缩放和提交 |
 
 ```text
 ID 或目录
@@ -73,6 +79,10 @@ ID 或目录
 ```
 
 `Frame` 持有 GPU 纹理，场景到输出不经过 CPU 像素读回。截图才执行读回。当前视频使用 FFmpeg 子进程解码为 CPU RGBA，再上传 GPU，不含硬件解码或跨设备纹理共享。
+
+macOS 后端复用 winit 事件循环和 wgpu Metal 输出。AppKit 窗口使用桌面层级，不拦截鼠标，并加入所有 Spaces。窗口坐标使用 NSScreen 的逻辑尺寸和位置，GPU 输出使用窗口的物理像素尺寸。Wayland 依赖仅在 Linux 编译，AppKit 依赖仅在 macOS 编译。
+
+macOS 每秒按原显示器 ID 重新检查布局，分辨率或位置变化时重新设置窗口大小和位置。选定显示器断开时程序退出，并报告原因。
 
 `scene`、`video` 和 `web` 不依赖 `output`。应用层把播放器回调交给 `output`，回调使用输出选择的同一个 GPU 设备。没有后台无界帧队列。
 
