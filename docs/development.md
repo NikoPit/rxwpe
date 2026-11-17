@@ -2,25 +2,25 @@
 
 用 Rust 播放 Wallpaper Engine 项目。GPU 后端使用 wgpu，桌面输出支持 macOS AppKit，以及支持 `wlr-layer-shell` 的 Wayland 合成器。
 
-当前已实现项目目录和 PKG 加载、静态图片场景、静音视频播放、普通窗口、Wayland 和 macOS 桌面窗口。尚未完整兼容 Wallpaper Engine。CLI 仅提供 `play` 命令。
+当前已实现项目目录和 PKG 加载、静态图片场景、静音视频播放、普通窗口、Wayland 和 macOS 桌面窗口。尚未完整兼容 Wallpaper Engine。CLI 直接接受壁纸目录或 ID，不使用子命令。
 
 ## 运行
 
 ```sh
 nix develop
-cargo run -- play examples/static-scene --window
+cargo run -- examples/static-scene --window
 ```
 
 作为 Wayland 桌面壁纸运行：
 
 ```sh
-cargo run -- play examples/static-scene --display DP-1
+cargo run -- examples/static-scene --display DP-1
 ```
 
 macOS 自动使用 AppKit 桌面窗口：
 
 ```sh
-cargo run -- play examples/static-scene --display 0
+cargo run -- examples/static-scene --display 0
 ```
 
 播放默认按操作系统选择桌面输出。Linux 使用 Wayland layer-shell，macOS 使用 AppKit。`--window` 打开普通预览窗口。`--display` 可省略，Wayland 由合成器选择输出，macOS 使用主显示器。macOS 接受显示器名称或从零开始的索引。一个进程目前只创建一个输出窗口。普通窗口可以按 Escape 退出，桌面模式可以通过 Ctrl+C 停止。
@@ -29,15 +29,15 @@ Nix 在 Linux 和 Apple Silicon macOS 提供构建与运行入口。当前锁定
 
 ```sh
 nix build
-nix run . -- play examples/static-scene --window
+nix run . -- examples/static-scene --window
 ```
 
 ## 加载已有壁纸
 
 ```sh
-cargo run -- play /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
-cargo run -- play 123456789 --steam-library /path/to/SteamLibrary
-cargo run -- play /path/to/video-wallpaper
+cargo run -- /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
+cargo run -- 123456789 --steam-library /path/to/SteamLibrary
+cargo run -- /path/to/video-wallpaper
 ```
 
 数字参数表示已经下载的 Workshop ID，程序查找 `steamapps/workshop/content/431960/<ID>`。支持常见 Steam 安装目录，额外游戏库通过 `--steam-library` 指定。目前不解析 `libraryfolders.vdf`，也不下载 Workshop 内容。
@@ -47,7 +47,7 @@ cargo run -- play /path/to/video-wallpaper
 通过 `--property NAME=VALUE` 覆盖项目定义的用户参数。值优先按 JSON 解析，也接受普通字符串：
 
 ```sh
-cargo run -- play examples/static-scene --window --property opacity=0.5
+cargo run -- examples/static-scene --window --property opacity=0.5
 ```
 
 ## Crate 职责

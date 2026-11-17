@@ -17,7 +17,7 @@ Without Nix, install Rust and FFmpeg before running the commands below.
 Try the included example in a window:
 
 ```sh
-cargo run -- play examples/static-scene --window
+cargo run -- examples/static-scene --window
 ```
 
 Press Escape or close the window to stop.
@@ -26,7 +26,7 @@ You can also build and run with Nix:
 
 ```sh
 nix build
-nix run . -- play examples/static-scene --window
+nix run . -- examples/static-scene --window
 ```
 
 ## Play a wallpaper
@@ -34,19 +34,19 @@ nix run . -- play examples/static-scene --window
 Use the directory containing the wallpaper's `project.json`:
 
 ```sh
-cargo run -- play /path/to/wallpaper
+cargo run -- /path/to/wallpaper
 ```
 
 For an already-downloaded Steam Workshop wallpaper, use its ID:
 
 ```sh
-cargo run -- play 123456789
+cargo run -- 123456789
 ```
 
 If it is in another Steam library, specify that library:
 
 ```sh
-cargo run -- play 123456789 --steam-library /path/to/SteamLibrary
+cargo run -- 123456789 --steam-library /path/to/SteamLibrary
 ```
 
 rxwpe does not download wallpapers. Download them through Steam first.
@@ -54,7 +54,7 @@ rxwpe does not download wallpapers. Download them through Steam first.
 If a wallpaper needs Wallpaper Engine's shared assets, provide their directory:
 
 ```sh
-cargo run -- play /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
+cargo run -- /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
 ```
 
 ## Set the desktop wallpaper
@@ -62,19 +62,19 @@ cargo run -- play /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
 Playback automatically uses your desktop on macOS or Linux with a Wayland compositor that supports layer-shell:
 
 ```sh
-cargo run -- play /path/to/wallpaper
+cargo run -- /path/to/wallpaper
 ```
 
 To choose a display on macOS, use its name or index, starting at zero:
 
 ```sh
-cargo run -- play /path/to/wallpaper --display 0
+cargo run -- /path/to/wallpaper --display 0
 ```
 
 On Wayland, choose a display by name:
 
 ```sh
-cargo run -- play /path/to/wallpaper --display DP-1
+cargo run -- /path/to/wallpaper --display DP-1
 ```
 
 Each process displays one wallpaper on one display. Press Ctrl+C in the terminal to stop.
@@ -86,7 +86,7 @@ On macOS, playback stops if the selected display disconnects.
 Choose how the wallpaper fits the display and set the maximum frame rate:
 
 ```sh
-cargo run -- play /path/to/wallpaper --scale fit --fps 30
+cargo run -- /path/to/wallpaper --scale fit --fps 30
 ```
 
 `--scale` accepts `fit`, `fill`, or `stretch`. The default is `fill`.
@@ -94,24 +94,23 @@ cargo run -- play /path/to/wallpaper --scale fit --fps 30
 Set the initial window size:
 
 ```sh
-cargo run -- play /path/to/wallpaper --window --size 1280x720
+cargo run -- /path/to/wallpaper --window --size 1280x720
 ```
 
 Override an option defined by the wallpaper:
 
 ```sh
-cargo run -- play examples/static-scene --property opacity=0.5
+cargo run -- examples/static-scene --property opacity=0.5
 ```
 
 Unsupported scene behavior prevents playback by default. To preview the supported parts:
 
 ```sh
-cargo run -- play /path/to/wallpaper --allow-partial
+cargo run -- /path/to/wallpaper --allow-partial
 ```
 
 ## Command help
 
 ```sh
 cargo run -- --help
-cargo run -- play --help
 ```
