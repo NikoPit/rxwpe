@@ -6,8 +6,8 @@ Currently supports basic image scenes and muted video playback. Web wallpapers a
 
 ## Supported platforms
 
-- MacOS
-- Linux (Wayland)
+- macOS
+- Linux with a Wayland compositor that supports layer-shell
 
 ## Get started
 
