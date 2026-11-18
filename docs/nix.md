@@ -4,9 +4,18 @@ The flake provides packages and a Home Manager module for Linux and Apple Silico
 
 ## Home Manager setup
 
-Add this repository as a flake input named `rxwpe`, then import its module in your Home Manager configuration:
+Add rxwpe to the `inputs` in your `flake.nix`:
 
 ```nix
+inputs.rxwpe.url = "github:NikoPit/rxwpe";
+```
+
+Include `inputs` in your flake's outputs arguments, for example `outputs = inputs@{ self, nixpkgs, ... }: ...`.
+
+Then import its module in your Home Manager configuration:
+
+```nix
+{ inputs, ... }:
 {
   imports = [ inputs.rxwpe.homeManagerModules.default ];
 

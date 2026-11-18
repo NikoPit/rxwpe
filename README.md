@@ -22,7 +22,13 @@ Press Ctrl+C to stop. See [usage](docs/usage.md) for more options.
 
 ## Declarative configuration with Nix
 
-Add `inputs.rxwpe.homeManagerModules.default` to your imports / module list. Here's an example configuration.
+Add rxwpe to your `flake.nix` inputs:
+
+```nix
+inputs.rxwpe.url = "github:NikoPit/rxwpe";
+```
+
+Then import its Home Manager module and choose a wallpaper:
 
 ```nix
 {
