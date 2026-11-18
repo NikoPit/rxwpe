@@ -21,7 +21,7 @@ Then import its module in your Home Manager configuration:
 
   services.rxwpe = {
     enable = true;
-    settings.wallpaper = "/home/alice/wallpapers/main";
+    settings.wallpaper = "123456789";
   };
 }
 ```
@@ -105,18 +105,3 @@ journalctl --user -u rxwpe
 ```
 
 On macOS, Home Manager starts rxwpe as a launchd agent in your graphical session.
-
-## Run from a checkout
-
-```sh
-nix build
-nix run . -- /path/to/wallpaper
-```
-
-To try the included example in a window:
-
-```sh
-nix run . -- examples/static-scene --window
-```
-
-For development commands, see [development](development.md).
