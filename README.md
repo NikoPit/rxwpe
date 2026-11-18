@@ -2,6 +2,8 @@
 
 Play Wallpaper Engine wallpapers on Linux and macOS.
 
+Currently supports basic image scenes and muted video playback. Web wallpapers and advanced scene effects are not supported yet.
+
 ## Supported platforms
 
 - MacOS
