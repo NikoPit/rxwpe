@@ -2,6 +2,11 @@
 
 Play Wallpaper Engine wallpapers on Linux and macOS.
 
+## Supported platforms
+
+- MacOS
+- Linux (Wayland)
+
 ## Get started
 
 Install Rust and FFmpeg, then run this from the repository directory to install rxwpe:
