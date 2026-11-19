@@ -151,7 +151,7 @@ fn parse_image(
     if model.get("puppet").is_some() {
         warnings.push(format!("{prefix}: puppet deformation is not implemented"));
     }
-    for field in ["fullscreen", "passthrough", "solidlayer", "autosize"] {
+    for field in ["fullscreen", "passthrough", "solidlayer"] {
         if model.get(field).and_then(Value::as_bool).unwrap_or(false) {
             warnings.push(format!("{prefix}: model flag {field} is not implemented"));
         }
@@ -248,7 +248,17 @@ fn parse_image(
         name => bail!("unsupported material blending mode: {name}"),
     };
     let origin = vector(object.get("origin"), [0.0; 3], project, warnings, "origin")?;
-    let size = vector(object.get("size"), [0.0; 2], project, warnings, "size")?;
+    // Autosized models take their natural dimensions from the texture at upload
+    // time. An explicit scene size still controls the displayed quad.
+    let natural_size = if model.get("autosize").and_then(Value::as_bool) == Some(true) {
+        [0.0; 2]
+    } else {
+        [
+            scalar(model.get("width"), 0.0, project, warnings, "model.width")?,
+            scalar(model.get("height"), 0.0, project, warnings, "model.height")?,
+        ]
+    };
+    let size = vector(object.get("size"), natural_size, project, warnings, "size")?;
     let scale = vector(object.get("scale"), [1.0; 3], project, warnings, "scale")?;
     let angles = vector(object.get("angles"), [0.0; 3], project, warnings, "angles")?;
     let alpha = scalar(object.get("alpha"), 1.0, project, warnings, "alpha")?;
@@ -620,6 +630,25 @@ mod tests {
         dir.write("scene.json", source);
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
         assert!(!scene.images[0].visible);
+        assert!(scene.warnings.is_empty());
+    }
+
+    #[test]
+    fn autosize_uses_texture_dimensions_unless_scene_supplies_size() {
+        let dir = TestDir::new();
+        dir.project();
+        dir.write("models/image.json", serde_json::json!({
+            "autosize":true, "width":100, "height":200,
+            "material":"materials/image.json"
+        }));
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert_eq!(scene.images[0].size, [1920.,1080.]);
+        assert!(scene.warnings.is_empty());
+        let mut source = scene.source;
+        source["objects"][0].as_object_mut().unwrap().remove("size");
+        dir.write("scene.json", source);
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert_eq!(scene.images[0].size, [0.,0.]);
         assert!(scene.warnings.is_empty());
     }
     #[test]
