@@ -62,6 +62,7 @@ pub struct Layer {
     pub blend: Blend,
     /// Optional projected corners in bottom-left, bottom-right, top-right, top-left order.
     pub corners: Option<[[f32; 2]; 4]>,
+    pub uv: [f32; 4],
 }
 
 impl Layer {
@@ -74,6 +75,7 @@ impl Layer {
             color: [1.; 4],
             blend: Blend::Alpha,
             corners: None,
+            uv: [0., 0., 1., 1.],
         }
     }
 }
@@ -481,6 +483,10 @@ fn quad_vertices(layer: &Layer, width: u32, height: u32) -> [Vertex; 6] {
     let (sin, cos) = layer.rotation.sin_cos();
     let points = std::array::from_fn::<_, 4, _>(|index| {
         let (p, uv) = corners[index];
+        let uv = [
+            layer.uv[0] + uv[0] * (layer.uv[2] - layer.uv[0]),
+            layer.uv[1] + uv[1] * (layer.uv[3] - layer.uv[1]),
+        ];
         let x = p[0] * layer.size[0];
         let y = p[1] * layer.size[1];
         let point = layer.corners.map(|corners| corners[index]).unwrap_or([

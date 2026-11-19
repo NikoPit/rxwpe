@@ -138,6 +138,7 @@ impl<'a> Presenter<'a> {
             scaled_size(frame.width(), frame.height(), width, height, self.scale);
         let layer = Layer {
             corners: None,
+            uv: [0., 0., 1., 1.],
             image: frame.image.clone(),
             center: [width as f32 / 2., height as f32 / 2.],
             size: [draw_width, draw_height],

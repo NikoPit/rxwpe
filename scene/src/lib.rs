@@ -10,6 +10,7 @@ use anyhow::{Context, Result, ensure};
 use rxwpe_gpu::{Blend, Frame, Gpu, GpuImage, Layer};
 use rxwpe_media::{MediaFile, VideoDecoder};
 use rxwpe_parser::{BlendMode, Project, SceneDocument, decode_texture, video_texture};
+mod particle;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SceneOptions {
@@ -21,6 +22,8 @@ pub struct ScenePlayer {
     layers: Vec<Layer>,
     frame: Option<Frame>,
     videos: Vec<VideoTexture>,
+    particles: Vec<particle::ParticleSystem>,
+    image_orders: Vec<usize>,
 }
 
 struct VideoTexture {
@@ -44,10 +47,12 @@ impl ScenePlayer {
         let mut layers = Vec::new();
         let mut videos: Vec<VideoTexture> = Vec::new();
         let mut video_indices = HashMap::new();
+        let mut image_orders = Vec::new();
         for image in &document.images {
             if !image.visible {
                 continue;
             }
+            image_orders.push(image.order);
             let texture = if let Some(texture) = textures.get(&image.texture) {
                 texture.clone()
             } else {
@@ -93,6 +98,7 @@ impl ScenePlayer {
                 },
             ];
             layers.push(Layer {
+                uv: [0., 0., 1., 1.],
                 corners: Some(
                     [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(|p| {
                         let mut v = [
@@ -130,11 +136,32 @@ impl ScenePlayer {
                 ],
             });
         }
+        let mut particles = Vec::new();
+        for definition in &document.particles {
+            if !definition.visible {
+                continue;
+            }
+            let decoded =
+                rxwpe_parser::decode_sprite_texture(&project.assets.read(&definition.texture)?)
+                    .with_context(|| format!("decode particle texture {}", definition.texture))?;
+            let image = gpu.upload_rgba(
+                decoded.texture.width,
+                decoded.texture.height,
+                &decoded.texture.rgba,
+            )?;
+            particles.push(particle::ParticleSystem::new(
+                definition.clone(),
+                image,
+                decoded.frames,
+            ));
+        }
         Ok(Self {
             document,
             layers,
             frame: None,
             videos,
+            particles,
+            image_orders,
         })
     }
 
@@ -148,6 +175,9 @@ impl ScenePlayer {
 
     /// Static scenes reuse their completed GPU frame until the player changes.
     pub fn render(&mut self, gpu: &Gpu, elapsed: Duration) -> Result<Frame> {
+        if !self.particles.is_empty() {
+            self.frame = None;
+        }
         for video in &mut self.videos {
             let decoded = video.decoder.frame_at(elapsed)?;
             if decoded.timestamp != video.timestamp {
@@ -162,11 +192,26 @@ impl ScenePlayer {
         if let Some(frame) = &self.frame {
             return Ok(frame.clone());
         }
+        let mut ordered: Vec<(usize, Vec<Layer>)> = self
+            .layers
+            .iter()
+            .zip(&self.image_orders)
+            .map(|(layer, order)| (*order, vec![layer.clone()]))
+            .collect();
+        for system in &mut self.particles {
+            system.advance(elapsed);
+            ordered.push((
+                system.definition.order,
+                system.layers(&self.document.camera),
+            ));
+        }
+        ordered.sort_by_key(|(order, _)| *order);
+        let layers: Vec<Layer> = ordered.into_iter().flat_map(|(_, layers)| layers).collect();
         let frame = gpu.render_layers(
             self.document.width,
             self.document.height,
             self.document.clear_color.map(f64::from),
-            &self.layers,
+            &layers,
         )?;
         let frame = if let Some(bloom) = &self.document.bloom {
             gpu.bloom(&frame, bloom.threshold, bloom.strength, bloom.tint)?

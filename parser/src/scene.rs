@@ -3,6 +3,9 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{Project, read_json};
+#[path = "particle.rs"]
+mod particle;
+pub use particle::{Emitter, Initializer, Operator, ParticleLayer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -15,6 +18,7 @@ pub enum BlendMode {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ImageLayer {
+    pub order: usize,
     pub id: i64,
     pub name: String,
     pub origin: [f32; 3],
@@ -41,6 +45,7 @@ pub struct SceneDocument {
     pub camera: SceneCamera,
     pub bloom: Option<BloomSettings>,
     pub images: Vec<ImageLayer>,
+    pub particles: Vec<ParticleLayer>,
     pub warnings: Vec<String>,
     pub source: Value,
 }
@@ -148,22 +153,31 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         .and_then(Value::as_array)
         .context("scene has no objects array")?;
     let mut images = Vec::new();
-    for object in objects {
+    let mut particles = Vec::new();
+    for (order, object) in objects.iter().enumerate() {
         let id = object.get("id").and_then(Value::as_i64).unwrap_or(-1);
         let label = object
             .get("name")
             .and_then(Value::as_str)
             .unwrap_or("unnamed");
+        if let Some(path) = object.get("particle").and_then(Value::as_str) {
+            particles.push(
+                particle::parse(project, object, path, order, &mut warnings)
+                    .with_context(|| format!("cannot load particle {id} ({label})"))?,
+            );
+            continue;
+        }
         let Some(model_path) = object.get("image").and_then(Value::as_str) else {
-            let kind = ["particle", "sound", "text", "model", "light"]
+            let kind = ["text", "model", "light"]
                 .into_iter()
                 .find(|key| object.get(key).is_some())
                 .unwrap_or("object/group");
             warnings.push(format!("object {id} ({label}): {kind} is not implemented"));
             continue;
         };
-        let image = parse_image(project, object, model_path, &mut warnings)
+        let mut image = parse_image(project, object, model_path, &mut warnings)
             .with_context(|| format!("cannot load image object {id} ({label})"))?;
+        image.order = order;
         images.push(image);
     }
     Ok(SceneDocument {
@@ -173,6 +187,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         camera,
         bloom,
         images,
+        particles,
         warnings,
         source,
     })
@@ -364,6 +379,7 @@ fn parse_image(
     let color = color(object.get("color"), project, warnings)?;
     let visible = boolean(object.get("visible"), true, project, warnings, "visible")?;
     Ok(ImageLayer {
+        order: 0,
         id,
         name,
         origin,
@@ -801,11 +817,11 @@ mod tests {
         source["objects"]
             .as_array_mut()
             .unwrap()
-            .push(serde_json::json!({"id":8,"particle":"particles/snow.json"}));
+            .push(serde_json::json!({"id":8,"text":"unsupported"}));
         dir.write("scene.json", source);
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
         assert!(scene.warnings.iter().any(|s| s.contains("effects")));
-        assert!(scene.warnings.iter().any(|s| s.contains("particle")));
+        assert!(scene.warnings.iter().any(|s| s.contains("text")));
     }
     #[test]
     fn reports_ignored_camera_and_material_state() {

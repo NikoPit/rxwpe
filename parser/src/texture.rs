@@ -17,6 +17,18 @@ pub struct DecodedTexture {
     pub rgba: Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
+pub struct TextureFrame {
+    /// UV rectangle in top-left-origin texture coordinates.
+    pub uv: [f32; 4],
+    pub duration: f32,
+}
+
+pub struct SpriteTexture {
+    pub texture: DecodedTexture,
+    pub frames: Vec<TextureFrame>,
+}
+
 /// Returns the borrowed encoded video payload of a TEX video container.
 /// Video size is bounded by the asset store, independently of decoded image size.
 pub fn video_texture(bytes: &[u8]) -> Result<Option<&[u8]>> {
@@ -79,12 +91,24 @@ pub fn video_texture(bytes: &[u8]) -> Result<Option<&[u8]>> {
 /// Animation, video payloads and shader-dependent single/dual-channel textures
 /// return an error instead of silently presenting an incorrect static image.
 pub fn decode_texture(bytes: &[u8]) -> Result<DecodedTexture> {
+    Ok(decode_sprite_inner(bytes, false)?.texture)
+}
+
+/// Decode a sprite atlas, including TEXS frame rectangles and frame durations.
+pub fn decode_sprite_texture(bytes: &[u8]) -> Result<SpriteTexture> {
+    decode_sprite_inner(bytes, true)
+}
+
+fn decode_sprite_inner(bytes: &[u8], animated: bool) -> Result<SpriteTexture> {
     ensure!(
         bytes.len() <= MAX_BYTES,
         "texture file exceeds the 256 MiB limit"
     );
     if !bytes.starts_with(b"TEXV") {
-        return decode_image(bytes);
+        return Ok(SpriteTexture {
+            texture: decode_image(bytes)?,
+            frames: Vec::new(),
+        });
     }
     let mut reader = Reader { bytes, offset: 0 };
     ensure!(reader.take(9)? == b"TEXV0005\0", "unsupported TEX version");
@@ -100,7 +124,7 @@ pub fn decode_texture(bytes: &[u8]) -> Result<DecodedTexture> {
     let logical_height = reader.u32()?;
     let _reserved = reader.u32()?;
     ensure!(
-        flags & 4 == 0,
+        animated || flags & 4 == 0,
         "animated TEX textures are not supported yet"
     );
     ensure!(flags & 32 == 0, "video TEX textures require video playback");
@@ -191,7 +215,71 @@ pub fn decode_texture(bytes: &[u8]) -> Result<DecodedTexture> {
         logical_width <= decoded.width && logical_height <= decoded.height,
         "TEX logical dimensions exceed the decoded texture dimensions"
     );
-    crop(decoded, logical_width, logical_height)
+    let texture = crop(decoded, logical_width, logical_height)?;
+    let mut frames = Vec::new();
+    if flags & 4 != 0 {
+        let version = match reader.take(9)? {
+            b"TEXS0001\0" => 1,
+            b"TEXS0002\0" => 2,
+            b"TEXS0003\0" => 3,
+            _ => bail!("unsupported TEX sprite animation version"),
+        };
+        let count = reader.u32()?;
+        ensure!(
+            (1..=65536).contains(&count),
+            "invalid TEX animation frame count"
+        );
+        if version == 3 {
+            reader.u32()?;
+            reader.u32()?;
+        }
+        for _ in 0..count {
+            ensure!(
+                reader.u32()? == 0,
+                "multiple-image TEX animations are not supported"
+            );
+            let duration = f32::from_bits(reader.u32()?);
+            ensure!(
+                duration.is_finite() && duration > 0.,
+                "invalid TEX frame duration"
+            );
+            let mut rect = [0.; 6];
+            for v in &mut rect {
+                let bits = reader.u32()?;
+                *v = if version == 1 {
+                    bits as f32
+                } else {
+                    f32::from_bits(bits)
+                };
+            }
+            ensure!(
+                rect.iter().all(|v| v.is_finite())
+                    && rect[2] > 0.
+                    && rect[5] > 0.
+                    && rect[3] == 0.
+                    && rect[4] == 0.,
+                "invalid or rotated TEX atlas frame"
+            );
+            let [x, y, w, _, _, h] = rect;
+            ensure!(
+                x >= 0.
+                    && y >= 0.
+                    && x + w <= texture.width as f32
+                    && y + h <= texture.height as f32,
+                "TEX atlas frame exceeds texture bounds"
+            );
+            frames.push(TextureFrame {
+                duration,
+                uv: [
+                    x / texture.width as f32,
+                    y / texture.height as f32,
+                    (x + w) / texture.width as f32,
+                    (y + h) / texture.height as f32,
+                ],
+            });
+        }
+    }
+    Ok(SpriteTexture { texture, frames })
 }
 
 fn decode_image(bytes: &[u8]) -> Result<DecodedTexture> {
@@ -263,7 +351,20 @@ fn decode_raw(format: u32, width: u32, height: u32, bytes: &[u8]) -> Result<Deco
                 .collect()
         }
         4 | 6 | 7 => decode_bc(format, width, height, bytes)?,
-        8 | 9 => bail!("TEX format {format} requires material-specific channel swizzling"),
+        8 => {
+            ensure!(
+                bytes.len() == pixels * 2,
+                "RG88 texture payload size mismatch"
+            );
+            bytes
+                .chunks_exact(2)
+                .flat_map(|p| [p[0], p[0], p[0], p[1]])
+                .collect()
+        }
+        9 => {
+            ensure!(bytes.len() == pixels, "R8 texture payload size mismatch");
+            bytes.iter().flat_map(|v| [255, 255, 255, *v]).collect()
+        }
         _ => bail!("unsupported TEX pixel format {format}"),
     };
     Ok(DecodedTexture {
@@ -442,6 +543,35 @@ mod tests {
             assert_eq!((decoded.width, decoded.height), (2, 1));
             assert_eq!(decoded.rgba, pixels);
         }
+    }
+
+    #[test]
+    fn animated_tex_returns_frame_rectangles_and_rg88_channels() {
+        let mut bytes = tex(8, 2, 1, &[12, 34, 56, 78], false);
+        bytes[22..26].copy_from_slice(&4u32.to_le_bytes());
+        bytes[46..55].copy_from_slice(b"TEXB0003\0");
+        bytes.splice(59..59, u32::MAX.to_le_bytes());
+        bytes.extend_from_slice(b"TEXS0003\0");
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        bytes.extend_from_slice(&2u32.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        for value in [
+            0u32,
+            0.5f32.to_bits(),
+            0.0f32.to_bits(),
+            0.0f32.to_bits(),
+            1.0f32.to_bits(),
+            0u32,
+            0u32,
+            1.0f32.to_bits(),
+        ] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        let decoded = decode_sprite_texture(&bytes).unwrap();
+        assert_eq!(decoded.texture.rgba, [12, 12, 12, 34, 56, 56, 56, 78]);
+        assert_eq!(decoded.frames.len(), 1);
+        assert_eq!(decoded.frames[0].uv, [0., 0., 0.5, 1.]);
+        assert_eq!(decoded.frames[0].duration, 0.5);
     }
 
     #[test]
