@@ -1,11 +1,12 @@
 //! Shared media decoding. FFmpeg produces a bounded stream of CPU RGBA frames.
 //!
-//! Audio playback and system-audio capture are not implemented yet. The video
-//! decoder deliberately disables audio rather than starting an unsynchronised
-//! second player.
+//! Scene audio playback uses an owned FFplay process. The video decoder
+//! deliberately disables embedded video audio to avoid unsynchronised streams.
 
+mod audio;
 mod file;
 mod video;
 
+pub use audio::AudioPlayback;
 pub use file::MediaFile;
 pub use video::{DecodedFrame, VideoDecoder, VideoInfo};

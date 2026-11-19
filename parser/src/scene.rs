@@ -5,7 +5,10 @@ use serde_json::Value;
 use crate::{Project, read_json};
 #[path = "particle.rs"]
 mod particle;
+#[path = "sound.rs"]
+mod sound;
 pub use particle::{Emitter, Initializer, Operator, ParticleLayer};
+pub use sound::SoundLayer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -46,6 +49,7 @@ pub struct SceneDocument {
     pub bloom: Option<BloomSettings>,
     pub images: Vec<ImageLayer>,
     pub particles: Vec<ParticleLayer>,
+    pub sounds: Vec<SoundLayer>,
     pub warnings: Vec<String>,
     pub source: Value,
 }
@@ -154,6 +158,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         .context("scene has no objects array")?;
     let mut images = Vec::new();
     let mut particles = Vec::new();
+    let mut sounds = Vec::new();
     for (order, object) in objects.iter().enumerate() {
         let id = object.get("id").and_then(Value::as_i64).unwrap_or(-1);
         let label = object
@@ -164,6 +169,13 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
             particles.push(
                 particle::parse(project, object, path, order, &mut warnings)
                     .with_context(|| format!("cannot load particle {id} ({label})"))?,
+            );
+            continue;
+        }
+        if object.get("sound").is_some() {
+            sounds.push(
+                sound::parse(project, object, &mut warnings)
+                    .with_context(|| format!("cannot load sound {id} ({label})"))?,
             );
             continue;
         }
@@ -188,6 +200,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         bloom,
         images,
         particles,
+        sounds,
         warnings,
         source,
     })
@@ -924,6 +937,23 @@ mod tests {
         let bloom = scene.bloom.unwrap();
         assert_eq!(bloom.strength, 0.25);
         assert_eq!(bloom.threshold, 0.3);
+    }
+
+    #[test]
+    fn parses_looping_scene_sound_and_volume_override() {
+        let dir = TestDir::new();
+        dir.project();
+        fs::create_dir_all(dir.0.join("sounds")).unwrap();
+        fs::write(dir.0.join("sounds/loop.mp3"), b"audio").unwrap();
+        let mut source = Project::load(&dir.0, None).unwrap().scene().unwrap().source;
+        source["objects"].as_array_mut().unwrap().push(serde_json::json!({"id":10,"sound":["sounds/loop.mp3"],"playbackmode":"loop","volume":{"user":"opacity","value":1.0},"startsilent":false}));
+        dir.write("scene.json", source);
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert!(scene.warnings.is_empty());
+        assert_eq!(scene.sounds[0].paths, ["sounds/loop.mp3"]);
+        assert!(scene.sounds[0].looped);
+        assert!(!scene.sounds[0].startsilent);
+        assert_eq!(scene.sounds[0].volume, 0.25);
     }
     #[test]
     fn rejects_unknown_project_type_and_missing_entry() {

@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use rxwpe_gpu::{Blend, Frame, Gpu, GpuImage, Layer};
-use rxwpe_media::{MediaFile, VideoDecoder};
+use rxwpe_media::{AudioPlayback, MediaFile, VideoDecoder};
 use rxwpe_parser::{BlendMode, Project, SceneDocument, decode_texture, video_texture};
 mod particle;
 
@@ -24,6 +24,7 @@ pub struct ScenePlayer {
     videos: Vec<VideoTexture>,
     particles: Vec<particle::ParticleSystem>,
     image_orders: Vec<usize>,
+    _audio: Vec<AudioPlayback>,
 }
 
 struct VideoTexture {
@@ -155,6 +156,19 @@ impl ScenePlayer {
                 decoded.frames,
             ));
         }
+        let mut audio = Vec::new();
+        for sound in &document.sounds {
+            if sound.startsilent {
+                continue;
+            }
+            for path in &sound.paths {
+                audio.push(AudioPlayback::open(
+                    &project.assets.read(path)?,
+                    sound.looped,
+                    sound.volume,
+                )?);
+            }
+        }
         Ok(Self {
             document,
             layers,
@@ -162,6 +176,7 @@ impl ScenePlayer {
             videos,
             particles,
             image_orders,
+            _audio: audio,
         })
     }
 

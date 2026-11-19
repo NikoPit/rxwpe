@@ -16,7 +16,7 @@ mod scene;
 mod texture;
 pub use scene::{
     BlendMode, BloomSettings, Emitter, ImageLayer, Initializer, Operator, ParticleLayer,
-    SceneCamera, SceneDocument,
+    SceneCamera, SceneDocument, SoundLayer,
 };
 pub use texture::{
     DecodedTexture, SpriteTexture, TextureFrame, decode_sprite_texture, decode_texture,
