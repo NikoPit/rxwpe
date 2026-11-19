@@ -464,9 +464,8 @@ fn effective<'a>(
             if let Some(property) = project.metadata.properties.get(name) {
                 return Some(property.get("value").unwrap_or(property));
             }
-            warnings.push(format!(
-                "property {field}: user property {name:?} was not found"
-            ));
+            // Projects can retain bindings to properties deleted in the editor.
+            // Their serialized value remains the fallback, as for an unbound field.
         } else {
             warnings.push(format!(
                 "property {field}: conditional user binding is not implemented"
@@ -608,6 +607,20 @@ mod tests {
             .set_property("opacity", serde_json::json!(0.75))
             .unwrap();
         assert_eq!(project.scene().unwrap().images[0].alpha, 0.75);
+    }
+
+    #[test]
+    fn deleted_user_property_uses_serialized_fallback() {
+        let dir = TestDir::new();
+        dir.project();
+        let mut source: Value =
+            serde_json::from_slice(&fs::read(dir.0.join("scene.json")).unwrap()).unwrap();
+        source["objects"][0]["visible"] =
+            serde_json::json!({"user":"deleted_property", "value":false});
+        dir.write("scene.json", source);
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert!(!scene.images[0].visible);
+        assert!(scene.warnings.is_empty());
     }
     #[test]
     fn reports_unsupported_objects_and_effects() {
