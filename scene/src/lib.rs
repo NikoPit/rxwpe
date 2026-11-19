@@ -23,15 +23,7 @@ pub struct ScenePlayer {
 
 impl ScenePlayer {
     pub fn open(project: &Project, gpu: &Gpu, options: SceneOptions) -> Result<Self> {
-        let mut document = project.scene()?;
-        for image in &document.images {
-            if image.angles[0] != 0.0 || image.angles[1] != 0.0 {
-                document.warnings.push(format!(
-                    "object {}: rotation outside the image plane is not implemented",
-                    image.id
-                ));
-            }
-        }
+        let document = project.scene()?;
         ensure!(
             options.allow_partial || document.warnings.is_empty(),
             "scene requires unsupported behavior:\n  {}\nUse --allow-partial only to preview the supported image layers.",
@@ -71,6 +63,26 @@ impl ScenePlayer {
                 },
             ];
             layers.push(Layer {
+                corners: Some(
+                    [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(|p| {
+                        let mut v = [
+                            p[0] * size[0] * image.scale[0],
+                            p[1] * size[1] * image.scale[1],
+                            0.,
+                        ];
+                        for (axis, angle) in image.angles.iter().enumerate() {
+                            let (s, c) = angle.to_radians().sin_cos();
+                            let a = (axis + 1) % 3;
+                            let b = (axis + 2) % 3;
+                            let va = v[a] * c - v[b] * s;
+                            v[b] = v[a] * s + v[b] * c;
+                            v[a] = va;
+                        }
+                        document
+                            .camera
+                            .project(std::array::from_fn(|i| v[i] + image.origin[i]))
+                    }),
+                ),
                 image: texture,
                 center: [image.origin[0], image.origin[1]],
                 size: [size[0] * image.scale[0], size[1] * image.scale[1]],

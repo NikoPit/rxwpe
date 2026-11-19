@@ -38,9 +38,23 @@ pub struct SceneDocument {
     pub width: u32,
     pub height: u32,
     pub clear_color: [f32; 4],
+    pub camera: SceneCamera,
     pub images: Vec<ImageLayer>,
     pub warnings: Vec<String>,
     pub source: Value,
+}
+
+/// Orthographic world-to-canvas rows, including camera translation.
+#[derive(Debug, Clone, Serialize)]
+pub struct SceneCamera {
+    pub rows: [[f32; 4]; 2],
+}
+
+impl SceneCamera {
+    pub fn project(&self, point: [f32; 3]) -> [f32; 2] {
+        self.rows
+            .map(|row| row[0] * point[0] + row[1] * point[1] + row[2] * point[2] + row[3])
+    }
 }
 
 pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
@@ -61,7 +75,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
     let width = dimension(projection, "width")?;
     let height = dimension(projection, "height")?;
     let mut warnings = Vec::new();
-    check_camera(&source, width, height, project, &mut warnings)?;
+    let camera = parse_camera(&source, width, height, project, &mut warnings)?;
     let clear = vector::<3>(
         general.get("clearcolor"),
         [0.0; 3],
@@ -101,6 +115,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         width,
         height,
         clear_color: [clear[0], clear[1], clear[2], 1.0],
+        camera,
         images,
         warnings,
         source,
@@ -319,15 +334,17 @@ fn has_values(value: &Value) -> bool {
     }
 }
 
-fn check_camera(
+fn parse_camera(
     source: &Value,
     width: u32,
     height: u32,
     project: &Project,
     warnings: &mut Vec<String>,
-) -> Result<()> {
+) -> Result<SceneCamera> {
     let Some(camera) = source.get("camera") else {
-        return Ok(());
+        return Ok(SceneCamera {
+            rows: [[1., 0., 0., 0.], [0., 1., 0., 0.]],
+        });
     };
     let center = vector(
         camera.get("center"),
@@ -350,29 +367,61 @@ fn check_camera(
         warnings,
         "camera.up",
     )?;
-    // The initial renderer maps the standard orthographic image plane directly
-    // to pixels. It does not implement arbitrary look-at transforms or clipping.
+    let subtract = |a: [f32; 3], b: [f32; 3]| std::array::from_fn(|i| a[i] - b[i]);
+    let cross = |a: [f32; 3], b: [f32; 3]| {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    };
+    let normalize = |v: [f32; 3]| -> Result<[f32; 3]> {
+        let length = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        ensure!(
+            length > 0.000001,
+            "camera has a degenerate view or up vector"
+        );
+        Ok(v.map(|x| x / length))
+    };
+    let backward = normalize(subtract(eye, center))?;
+    let right = normalize(cross(up, backward))?;
+    let camera_up = cross(backward, right);
+    // Published scenes use an origin-based camera and canvas-centered object
+    // coordinates. Also accept the explicit canvas-centered camera convention.
     let standard_center = (center[0] - width as f32 / 2.0).abs() < 0.001
         && (center[1] - height as f32 / 2.0).abs() < 0.001
         && center[2].abs() < 0.001;
-    let standard_view = (eye[0] - center[0]).abs() < 0.001
-        && (eye[1] - center[1]).abs() < 0.001
-        && eye[2] > center[2]
-        && up[0].abs() < 0.001
-        && up[1] > 0.0
-        && up[2].abs() < 0.001;
-    if !standard_center || !standard_view {
-        warnings.push(
-            "camera transforms outside the standard orthographic image plane are not implemented"
-                .into(),
-        );
-    }
+    let half = [width as f32 / 2., height as f32 / 2.];
+    let offset = if standard_center {
+        [eye[0], eye[1], eye[2]]
+    } else {
+        [eye[0] + half[0], eye[1] + half[1], eye[2]]
+    };
+    let zoom = scalar(
+        source.pointer("/general/zoom"),
+        1.,
+        project,
+        warnings,
+        "zoom",
+    )?;
+    ensure!(zoom > 0., "camera zoom must be positive");
+    let rows = [right, camera_up].map(|axis| {
+        [
+            axis[0] * zoom,
+            axis[1] * zoom,
+            axis[2] * zoom,
+            -axis.iter().zip(offset).map(|(a, b)| a * b).sum::<f32>() * zoom,
+        ]
+    });
+    let mut rows = rows;
+    rows[0][3] += half[0];
+    rows[1][3] += half[1];
     for field in ["nearz", "farz"] {
         if camera.get(field).is_some() {
             warnings.push(format!("camera {field} clipping is not implemented"));
         }
     }
-    Ok(())
+    Ok(SceneCamera { rows })
 }
 
 fn dimension(projection: &Value, field: &str) -> Result<u32> {
@@ -715,7 +764,6 @@ mod tests {
         dir.write("materials/image.json",serde_json::json!({"passes":[{"shader":"genericimage2","textures":["example"],"usertextures":["mask"],"depthtest":"enabled"}]}));
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
         for expected in [
-            "camera transforms",
             "colorBlendMode",
             "image alignment",
             "usertextures",
@@ -743,6 +791,24 @@ mod tests {
             assert!(scene.images[0].color[1] > 0.5 && scene.images[0].color[1] < 0.54);
             assert_eq!(scene.images[0].color[2], 0.0);
         }
+    }
+
+    #[test]
+    fn origin_camera_and_rotated_orthographic_views_project_canvas_points() {
+        let dir = TestDir::new();
+        dir.project();
+        let mut source = Project::load(&dir.0, None).unwrap().scene().unwrap().source;
+        source["camera"] = serde_json::json!({"center":"0 0 -1","eye":"0 0 0","up":"0 1 0"});
+        dir.write("scene.json", source.clone());
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert!(scene.warnings.is_empty());
+        assert_eq!(scene.camera.project([0., 0., 0.]), [0., 0.]);
+        assert_eq!(scene.camera.project([1920., 1080., 0.]), [1920., 1080.]);
+        source["camera"]["up"] = serde_json::json!("1 0 0");
+        dir.write("scene.json", source);
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert!(scene.warnings.is_empty());
+        assert_eq!(scene.camera.project([970., 540., 0.]), [960., 550.]);
     }
     #[test]
     fn rejects_unknown_project_type_and_missing_entry() {

@@ -14,7 +14,7 @@ use serde_json::Value;
 
 mod scene;
 mod texture;
-pub use scene::{BlendMode, ImageLayer, SceneDocument};
+pub use scene::{BlendMode, ImageLayer, SceneCamera, SceneDocument};
 pub use texture::{DecodedTexture, decode_texture};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
