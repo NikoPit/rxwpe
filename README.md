@@ -2,8 +2,6 @@
 
 Play Wallpaper Engine wallpapers on Linux and macOS.
 
-Currently supports basic image scenes and muted video playback. Web wallpapers and advanced scene effects are not supported yet.
-
 ## Supported platforms
 
 - macOS
@@ -11,7 +9,7 @@ Currently supports basic image scenes and muted video playback. Web wallpapers a
 
 ## Get started
 
-Install Rust and FFmpeg, then run this from the repository directory to install rxwpe:
+Install Rust and FFmpeg with `ffplay`, then run this from the repository directory to install rxwpe:
 
 ```sh
 cargo install --path cli --locked
