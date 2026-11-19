@@ -42,6 +42,35 @@ rxwpe automatically finds Wallpaper Engine's shared assets in standard Steam lib
 rxwpe /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
 ```
 
+## macOS wallpaper setup
+
+Wallpaper Engine has no official macOS version, so you need to download the wallpaper and assets then transfer them to your macOS machine for it to work.
+
+1. On the Windows or Linux machine, install Wallpaper Engine through Steam and wait for the wallpaper to finish downloading.
+2. Find its directory in the Steam library containing the wallpaper:
+
+   ```text
+   <SteamLibrary>/steamapps/workshop/content/431960/<ID>/
+   ```
+
+   You can find Steam library locations in Steam Settings > Storage. Copy the entire directory to your Mac.
+
+3. Copy wallpaper engine's assets directory. In Steam, right-click Wallpaper Engine and choose Manage > Browse local files. Copy the entire `assets` directory to your Mac. Its usual source location is:
+
+   ```text
+   <SteamLibrary>/steamapps/common/wallpaper_engine/assets/
+   ```
+
+4. Play the copied wallpaper using its directory path:
+
+   ```sh
+   rxwpe <WALLPAPER_DIR> --assets <ASSETS_DIR>
+   ```
+
+Steam does not need to be installed on your Mac for playback by directory path. Use the full path for files copied outside a Steam library; the Workshop ID alone will not find them.
+
+For Home Manager, set `settings.wallpaper` and `settings.assets` to the corresponding absolute paths on your Mac. See [Nix configuration](nix.md) for an example using local files.
+
 ## Choose a display
 
 Without `--display`, macOS uses the primary display and Wayland lets the compositor choose. Each process displays one wallpaper on one display.

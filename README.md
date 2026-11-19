@@ -17,7 +17,9 @@ Install Rust and FFmpeg, then run this from the repository directory to install 
 cargo install --path cli --locked
 ```
 
-Make sure you have wallpaper engine installed on this machine, and all of the assets have finished downloading. Although wallpaper engine does not support linux, installing it still also downloads all of the workshop items with it, which is needed for rxwpe.
+On macOS, follow [macOS wallpaper setup](docs/usage.md#macos-wallpaper-setup) to prepare your files and play them by directory path.
+
+On Linux, make sure you have wallpaper engine installed on this machine, and all of the assets have finished downloading. Although wallpaper engine does not support linux, installing it still also downloads all of the workshop items with it, which is needed for rxwpe.
 
 Play the downloaded wallpaper using its Workshop ID:
 
