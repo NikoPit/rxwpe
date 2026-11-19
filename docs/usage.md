@@ -4,7 +4,7 @@
 rxwpe [OPTIONS] <WALLPAPER>
 ```
 
-Desktop playback supports macOS and Linux with a Wayland compositor that supports layer-shell. Basic image scenes and muted video playback are supported. Web wallpapers and advanced scene effects are not supported yet.
+Desktop playback supports macOS and Linux with a Wayland compositor that supports layer-shell.
 
 ## Choose a wallpaper
 
