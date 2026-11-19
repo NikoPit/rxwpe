@@ -166,12 +166,23 @@ fn parse_image(
             "{prefix}: shader {shader:?} uses the basic image fallback"
         ));
     }
-    if pass
-        .get("combos")
-        .and_then(Value::as_object)
-        .is_some_and(|v| !v.is_empty())
-    {
-        warnings.push(format!("{prefix}: material combos are not implemented"));
+    if let Some(combos) = pass.get("combos").and_then(Value::as_object) {
+        for (name, value) in combos {
+            // VERSION selects the image color uniform ABI. Our image pipeline
+            // already supplies the equivalent brightness, tint and alpha.
+            let supported = ["genericimage", "genericimage2"].contains(&shader.as_str())
+                && match name.as_str() {
+                    "VERSION" => value.as_i64().is_some_and(|v| (0..=2).contains(&v)),
+                    "LIGHTING" | "REFLECTION" | "NORMALMAP" | "PBRMASKS" | "BLENDMODE"
+                    | "SKINNING" => value.as_i64() == Some(0),
+                    _ => false,
+                };
+            if !supported {
+                warnings.push(format!(
+                    "{prefix}: material combo {name}={value} is not implemented"
+                ));
+            }
+        }
     }
     if pass
         .get("constantshadervalues")
@@ -637,19 +648,43 @@ mod tests {
     fn autosize_uses_texture_dimensions_unless_scene_supplies_size() {
         let dir = TestDir::new();
         dir.project();
-        dir.write("models/image.json", serde_json::json!({
-            "autosize":true, "width":100, "height":200,
-            "material":"materials/image.json"
-        }));
+        dir.write(
+            "models/image.json",
+            serde_json::json!({
+                "autosize":true, "width":100, "height":200,
+                "material":"materials/image.json"
+            }),
+        );
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
-        assert_eq!(scene.images[0].size, [1920.,1080.]);
+        assert_eq!(scene.images[0].size, [1920., 1080.]);
         assert!(scene.warnings.is_empty());
         let mut source = scene.source;
         source["objects"][0].as_object_mut().unwrap().remove("size");
         dir.write("scene.json", source);
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
-        assert_eq!(scene.images[0].size, [0.,0.]);
+        assert_eq!(scene.images[0].size, [0., 0.]);
         assert!(scene.warnings.is_empty());
+    }
+
+    #[test]
+    fn supports_image_color_versions_and_rejects_unimplemented_shader_features() {
+        let dir = TestDir::new();
+        dir.project();
+        for (combos, supported) in [
+            (serde_json::json!({"VERSION":2}), true),
+            (serde_json::json!({"VERSION":1,"LIGHTING":0}), true),
+            (serde_json::json!({"VERSION":2,"LIGHTING":1}), false),
+            (serde_json::json!({"VERSION":99}), false),
+        ] {
+            dir.write(
+                "materials/image.json",
+                serde_json::json!({"passes":[{
+                    "shader":"genericimage2","textures":["example"],"combos":combos
+                }]}),
+            );
+            let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+            assert_eq!(scene.warnings.is_empty(), supported);
+        }
     }
     #[test]
     fn reports_unsupported_objects_and_effects() {
