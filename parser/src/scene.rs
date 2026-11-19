@@ -39,9 +39,17 @@ pub struct SceneDocument {
     pub height: u32,
     pub clear_color: [f32; 4],
     pub camera: SceneCamera,
+    pub bloom: Option<BloomSettings>,
     pub images: Vec<ImageLayer>,
     pub warnings: Vec<String>,
     pub source: Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BloomSettings {
+    pub strength: f32,
+    pub threshold: f32,
+    pub tint: [f32; 3],
 }
 
 /// Orthographic world-to-canvas rows, including camera translation.
@@ -99,7 +107,38 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
     {
         warnings.push("global camera paths and their transition fades are not implemented".into());
     }
-    for field in ["bloom", "cameraparallax", "camerashake"] {
+    let bloom = if boolean(general.get("bloom"), false, project, &mut warnings, "bloom")? {
+        if boolean(general.get("hdr"), false, project, &mut warnings, "hdr")? {
+            warnings.push("HDR scene bloom is not implemented; only SDR bloom is supported".into());
+        }
+        Some(BloomSettings {
+            strength: scalar(
+                general.get("bloomstrength"),
+                2.,
+                project,
+                &mut warnings,
+                "bloomstrength",
+            )?
+            .max(0.),
+            threshold: scalar(
+                general.get("bloomthreshold"),
+                0.65,
+                project,
+                &mut warnings,
+                "bloomthreshold",
+            )?,
+            tint: vector(
+                general.get("bloomtint"),
+                [1.; 3],
+                project,
+                &mut warnings,
+                "bloomtint",
+            )?,
+        })
+    } else {
+        None
+    };
+    for field in ["cameraparallax", "camerashake"] {
         if boolean(general.get(field), false, project, &mut warnings, field)? {
             warnings.push(format!("scene {field} is not implemented"));
         }
@@ -132,6 +171,7 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         height,
         clear_color: [clear[0], clear[1], clear[2], 1.0],
         camera,
+        bloom,
         images,
         warnings,
         source,
@@ -852,6 +892,22 @@ mod tests {
                 .iter()
                 .any(|w| w.contains("global camera paths"))
         );
+    }
+
+    #[test]
+    fn bloom_resolves_user_settings() {
+        let dir = TestDir::new();
+        dir.project();
+        let mut source = Project::load(&dir.0, None).unwrap().scene().unwrap().source;
+        source["general"]["bloom"] = true.into();
+        source["general"]["bloomstrength"] = serde_json::json!({"user":"opacity","value":2});
+        source["general"]["bloomthreshold"] = 0.3.into();
+        dir.write("scene.json", source);
+        let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
+        assert!(scene.warnings.is_empty());
+        let bloom = scene.bloom.unwrap();
+        assert_eq!(bloom.strength, 0.25);
+        assert_eq!(bloom.threshold, 0.3);
     }
     #[test]
     fn rejects_unknown_project_type_and_missing_entry() {

@@ -10,6 +10,7 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
 pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+mod bloom;
 
 pub struct Gpu {
     pub instance: Arc<wgpu::Instance>,
@@ -17,6 +18,7 @@ pub struct Gpu {
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     compositor: Compositor,
+    bloom: bloom::Bloom,
 }
 
 pub struct GpuImage {
@@ -107,12 +109,14 @@ impl Gpu {
             .await
             .context("create GPU device")?;
         let compositor = Compositor::new(&device, FRAME_FORMAT);
+        let bloom = bloom::Bloom::new(&device);
         Ok(Arc::new(Self {
             instance,
             adapter: Arc::new(adapter),
             device: Arc::new(device),
             queue: Arc::new(queue),
             compositor,
+            bloom,
         }))
     }
 
@@ -154,6 +158,15 @@ impl Gpu {
     }
 
     pub fn create_image(&self, width: u32, height: u32) -> Result<Arc<GpuImage>> {
+        self.create_image_format(width, height, FRAME_FORMAT)
+    }
+
+    fn create_image_format(
+        &self,
+        width: u32,
+        height: u32,
+        format: wgpu::TextureFormat,
+    ) -> Result<Arc<GpuImage>> {
         self.validate_size(width, height)?;
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("wallpaper image"),
@@ -165,7 +178,7 @@ impl Gpu {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: FRAME_FORMAT,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::COPY_SRC
@@ -250,6 +263,16 @@ impl Gpu {
         drop(mapped);
         buffer.unmap();
         Ok(rgba)
+    }
+
+    pub fn bloom(
+        &self,
+        frame: &Frame,
+        threshold: f32,
+        strength: f32,
+        tint: [f32; 3],
+    ) -> Result<Frame> {
+        self.bloom.apply(self, frame, threshold, strength, tint)
     }
 
     pub fn save_png(&self, frame: &Frame, path: impl AsRef<Path>) -> Result<()> {

@@ -168,6 +168,11 @@ impl ScenePlayer {
             self.document.clear_color.map(f64::from),
             &self.layers,
         )?;
+        let frame = if let Some(bloom) = &self.document.bloom {
+            gpu.bloom(&frame, bloom.threshold, bloom.strength, bloom.tint)?
+        } else {
+            frame
+        };
         self.frame = Some(frame.clone());
         Ok(frame)
     }
