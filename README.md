@@ -17,7 +17,7 @@ Install Rust and FFmpeg, then run this from the repository directory to install 
 cargo install --path cli --locked
 ```
 
-Play a wallpaper with its Steam Workshop ID:
+Play a wallpaper with its Workshop ID, make sure that you have wallpaper engine installed and all the wallpapers downloaded:
 
 ```sh
 rxwpe 123456789
