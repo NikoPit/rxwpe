@@ -4,39 +4,26 @@ The flake provides packages and a Home Manager module for Linux and Apple Silico
 
 ## Home Manager setup
 
-Add rxwpe to the `inputs` in your `flake.nix`:
+Add rxwpe to your flake inputs:
 
 ```nix
 inputs.rxwpe.url = "github:NikoPit/rxwpe";
 ```
 
-Include `inputs` in your flake's outputs arguments, for example `outputs = inputs@{ self, nixpkgs, ... }: ...`.
-
-Then import its module in your Home Manager configuration:
+Then import the Home Manager module:
 
 ```nix
-{ inputs, ... }:
-{
-  imports = [ inputs.rxwpe.homeManagerModules.default ];
-
-  services.rxwpe = {
-    enable = true;
-    settings.wallpaper = "123456789";
-  };
-}
+imports = [ inputs.rxwpe.homeManagerModules.default ];
 ```
 
-Make `inputs` available to your Home Manager modules through `extraSpecialArgs`. For example, when creating a standalone Home Manager configuration:
+Example configuration:
 
 ```nix
-home-manager.lib.homeManagerConfiguration {
-  inherit pkgs;
-  extraSpecialArgs = { inherit inputs; };
-  modules = [ ./home.nix ];
-}
+services.rxwpe = {
+  enable = true;
+  settings.wallpaper = "123456789";
+};
 ```
-
-Apply your Home Manager configuration to install rxwpe and start the wallpaper with your graphical session. Set `services.rxwpe.enable = false` and apply again to disable it.
 
 ## Wallpaper settings
 

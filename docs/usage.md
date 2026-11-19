@@ -36,7 +36,7 @@ Specify additional Steam libraries with `--steam-library`. This option can be re
 rxwpe 123456789 --steam-library /path/to/SteamLibrary
 ```
 
-If a wallpaper needs Wallpaper Engine's shared assets, provide their directory:
+rxwpe automatically finds Wallpaper Engine's shared assets in standard Steam libraries. If you want to specifiy your own assets, you can do it like this:
 
 ```sh
 rxwpe /path/to/wallpaper --assets /path/to/wallpaper_engine/assets
