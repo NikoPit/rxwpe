@@ -83,7 +83,23 @@ pub(crate) fn load(project: &Project) -> Result<SceneDocument> {
         &mut warnings,
         "clearcolor",
     )?;
-    for field in ["bloom", "cameraparallax", "camerashake", "camerafade"] {
+    // Camera fade belongs to global camera path transitions. It is inert for
+    // a static camera, even when enabled in the editor's default settings.
+    let _camera_fade = boolean(
+        general.get("camerafade"),
+        true,
+        project,
+        &mut warnings,
+        "camerafade",
+    )?;
+    if source
+        .pointer("/camera/paths")
+        .and_then(Value::as_array)
+        .is_some_and(|v| !v.is_empty())
+    {
+        warnings.push("global camera paths and their transition fades are not implemented".into());
+    }
+    for field in ["bloom", "cameraparallax", "camerashake"] {
         if boolean(general.get(field), false, project, &mut warnings, field)? {
             warnings.push(format!("scene {field} is not implemented"));
         }
@@ -809,6 +825,33 @@ mod tests {
         let scene = Project::load(&dir.0, None).unwrap().scene().unwrap();
         assert!(scene.warnings.is_empty());
         assert_eq!(scene.camera.project([970., 540., 0.]), [960., 550.]);
+    }
+    #[test]
+    fn camera_fade_is_inert_without_global_camera_paths() {
+        let dir = TestDir::new();
+        dir.project();
+        let mut source = Project::load(&dir.0, None).unwrap().scene().unwrap().source;
+        source["general"]["camerafade"] = true.into();
+        dir.write("scene.json", source.clone());
+        assert!(
+            Project::load(&dir.0, None)
+                .unwrap()
+                .scene()
+                .unwrap()
+                .warnings
+                .is_empty()
+        );
+        source["camera"] = serde_json::json!({"paths":["camera.json"]});
+        dir.write("scene.json", source);
+        assert!(
+            Project::load(&dir.0, None)
+                .unwrap()
+                .scene()
+                .unwrap()
+                .warnings
+                .iter()
+                .any(|w| w.contains("global camera paths"))
+        );
     }
     #[test]
     fn rejects_unknown_project_type_and_missing_entry() {
