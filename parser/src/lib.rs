@@ -15,7 +15,7 @@ use serde_json::Value;
 mod scene;
 mod texture;
 pub use scene::{BlendMode, ImageLayer, SceneCamera, SceneDocument};
-pub use texture::{DecodedTexture, decode_texture};
+pub use texture::{DecodedTexture, decode_texture, video_texture};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

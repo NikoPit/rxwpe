@@ -8,3 +8,4 @@ anyhow.workspace = true
 rxwpe-assets.workspace = true
 rxwpe-parser.workspace = true
 rxwpe-gpu.workspace = true
+rxwpe-media.workspace = true

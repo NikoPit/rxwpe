@@ -4,6 +4,8 @@
 //! decoder deliberately disables audio rather than starting an unsynchronised
 //! second player.
 
+mod file;
 mod video;
 
+pub use file::MediaFile;
 pub use video::{DecodedFrame, VideoDecoder, VideoInfo};

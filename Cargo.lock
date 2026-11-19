@@ -1681,6 +1681,7 @@ dependencies = [
  "anyhow",
  "rxwpe-assets",
  "rxwpe-gpu",
+ "rxwpe-media",
  "rxwpe-parser",
 ]
 

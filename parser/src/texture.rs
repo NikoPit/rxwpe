@@ -17,6 +17,63 @@ pub struct DecodedTexture {
     pub rgba: Vec<u8>,
 }
 
+/// Returns the borrowed encoded video payload of a TEX video container.
+/// Video size is bounded by the asset store, independently of decoded image size.
+pub fn video_texture(bytes: &[u8]) -> Result<Option<&[u8]>> {
+    if !bytes.starts_with(b"TEXV") {
+        return Ok(None);
+    }
+    let mut reader = Reader { bytes, offset: 0 };
+    ensure!(reader.take(9)? == b"TEXV0005\0", "unsupported TEX version");
+    ensure!(
+        reader.take(9)? == b"TEXI0001\0",
+        "unsupported TEX image header"
+    );
+    reader.u32()?;
+    let flags = reader.u32()?;
+    if flags & 32 == 0 {
+        return Ok(None);
+    }
+    for _ in 0..5 {
+        reader.u32()?;
+    }
+    let version = match reader.take(9)? {
+        b"TEXB0003\0" => 3,
+        b"TEXB0004\0" => 4,
+        _ => bail!("unsupported video TEX data container"),
+    };
+    ensure!(reader.u32()? == 1, "video TEX requires one image");
+    reader.u32()?;
+    if version == 4 {
+        ensure!(reader.u32()? == 1, "unsupported TEX video codec");
+    }
+    ensure!(reader.u32()? == 1, "video TEX requires one mipmap");
+    if version == 4 {
+        reader.u32()?;
+        reader.u32()?;
+        let length = reader.bytes[reader.offset..]
+            .iter()
+            .position(|v| *v == 0)
+            .context("unterminated TEX video metadata")?;
+        reader.take(length + 1)?;
+        reader.u32()?;
+    }
+    let width = reader.u32()?;
+    let height = reader.u32()?;
+    rgba_size(width, height)?;
+    ensure!(
+        reader.u32()? == 0,
+        "compressed TEX video payload is unsupported"
+    );
+    let decoded = reader.u32()? as usize;
+    let stored = reader.u32()? as usize;
+    ensure!(
+        stored > 0 && (decoded == 0 || decoded == stored),
+        "invalid TEX video payload size"
+    );
+    Ok(Some(reader.take(stored)?))
+}
+
 /// Decodes a static texture to tightly packed RGBA8 pixels.
 ///
 /// Animation, video payloads and shader-dependent single/dual-channel textures
@@ -458,5 +515,17 @@ mod tests {
                 .to_string()
                 .contains("video")
         );
+    }
+
+    #[test]
+    fn extracts_video_without_decoding_or_copying_its_payload() {
+        let mut bytes = tex(0, 2, 1, b"encoded video", false);
+        bytes[22..26].copy_from_slice(&32u32.to_le_bytes());
+        bytes[46..55].copy_from_slice(b"TEXB0003\0");
+        bytes.splice(59..59, u32::MAX.to_le_bytes());
+        assert_eq!(video_texture(&bytes).unwrap().unwrap(), b"encoded video");
+        assert!(video_texture(&bytes[..bytes.len() - 1]).is_err());
+        bytes[75..79].copy_from_slice(&1u32.to_le_bytes());
+        assert!(video_texture(&bytes).is_err());
     }
 }

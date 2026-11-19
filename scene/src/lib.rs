@@ -8,7 +8,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use rxwpe_gpu::{Blend, Frame, Gpu, GpuImage, Layer};
-use rxwpe_parser::{BlendMode, Project, SceneDocument, decode_texture};
+use rxwpe_media::{MediaFile, VideoDecoder};
+use rxwpe_parser::{BlendMode, Project, SceneDocument, decode_texture, video_texture};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SceneOptions {
@@ -19,6 +20,15 @@ pub struct ScenePlayer {
     document: SceneDocument,
     layers: Vec<Layer>,
     frame: Option<Frame>,
+    videos: Vec<VideoTexture>,
+}
+
+struct VideoTexture {
+    decoder: VideoDecoder,
+    layers: Vec<usize>,
+    timestamp: Duration,
+    // Keep the asset until after its decoder closes.
+    _file: MediaFile,
 }
 
 impl ScenePlayer {
@@ -32,6 +42,8 @@ impl ScenePlayer {
 
         let mut textures: HashMap<String, Arc<GpuImage>> = HashMap::new();
         let mut layers = Vec::new();
+        let mut videos: Vec<VideoTexture> = Vec::new();
+        let mut video_indices = HashMap::new();
         for image in &document.images {
             if !image.visible {
                 continue;
@@ -40,16 +52,34 @@ impl ScenePlayer {
                 texture.clone()
             } else {
                 let bytes = project.assets.read(&image.texture)?;
-                let decoded = decode_texture(&bytes).with_context(|| {
-                    format!(
-                        "cannot decode texture {} for object {}",
-                        image.texture, image.id
-                    )
-                })?;
-                let texture = gpu.upload_rgba(decoded.width, decoded.height, &decoded.rgba)?;
+                let texture = if let Some(payload) = video_texture(&bytes)? {
+                    let file = MediaFile::from_bytes(payload)?;
+                    let mut decoder = VideoDecoder::open(file.path())?;
+                    let decoded = decoder.frame_at(Duration::ZERO)?;
+                    let texture = gpu.upload_rgba(decoded.width, decoded.height, &decoded.rgba)?;
+                    video_indices.insert(image.texture.clone(), videos.len());
+                    videos.push(VideoTexture {
+                        decoder,
+                        layers: Vec::new(),
+                        timestamp: decoded.timestamp,
+                        _file: file,
+                    });
+                    texture
+                } else {
+                    let decoded = decode_texture(&bytes).with_context(|| {
+                        format!(
+                            "cannot decode texture {} for object {}",
+                            image.texture, image.id
+                        )
+                    })?;
+                    gpu.upload_rgba(decoded.width, decoded.height, &decoded.rgba)?
+                };
                 textures.insert(image.texture.clone(), texture.clone());
                 texture
             };
+            if let Some(index) = video_indices.get(&image.texture) {
+                videos[*index].layers.push(layers.len());
+            }
             let size = [
                 if image.size[0] == 0.0 {
                     texture.width as f32
@@ -104,6 +134,7 @@ impl ScenePlayer {
             document,
             layers,
             frame: None,
+            videos,
         })
     }
 
@@ -116,7 +147,18 @@ impl ScenePlayer {
     }
 
     /// Static scenes reuse their completed GPU frame until the player changes.
-    pub fn render(&mut self, gpu: &Gpu, _elapsed: Duration) -> Result<Frame> {
+    pub fn render(&mut self, gpu: &Gpu, elapsed: Duration) -> Result<Frame> {
+        for video in &mut self.videos {
+            let decoded = video.decoder.frame_at(elapsed)?;
+            if decoded.timestamp != video.timestamp {
+                let texture = gpu.upload_rgba(decoded.width, decoded.height, &decoded.rgba)?;
+                for index in &video.layers {
+                    self.layers[*index].image = texture.clone();
+                }
+                video.timestamp = decoded.timestamp;
+                self.frame = None;
+            }
+        }
         if let Some(frame) = &self.frame {
             return Ok(frame.clone());
         }
