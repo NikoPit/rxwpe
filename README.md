@@ -17,7 +17,9 @@ Install Rust and FFmpeg, then run this from the repository directory to install 
 cargo install --path cli --locked
 ```
 
-Play a wallpaper with its Workshop ID, make sure that you have wallpaper engine installed and all the wallpapers downloaded:
+Make sure you have wallpaper engine installed on this machine, and all of the assets have finished downloading. Although wallpaper engine does not support linux, installing it still also downloads all of the workshop items with it, which is needed for rxwpe.
+
+Play the downloaded wallpaper using its Workshop ID:
 
 ```sh
 rxwpe 123456789
@@ -38,6 +40,8 @@ inputs.rxwpe.url = "github:NikoPit/rxwpe";
 Then import its Home Manager module and choose a wallpaper:
 
 ```nix
+{ inputs, ... }:
+
 {
   imports = [ inputs.rxwpe.homeManagerModules.default ];
 
