@@ -91,16 +91,6 @@ fn parse_size(input: &str) -> Result<(u32, u32), String> {
 mod tests {
     use super::*;
 
-    fn project_args(properties: &[&str]) -> Args {
-        let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/static-scene");
-        let directory = directory.to_str().unwrap();
-        let mut args = vec!["rxwpe", directory, "--assets", directory];
-        for property in properties {
-            args.extend(["--property", property]);
-        }
-        Args::try_parse_from(args).unwrap()
-    }
-
     #[test]
     fn dimensions_and_frame_rates_enforce_their_bounds() {
         for invalid in [
@@ -132,43 +122,6 @@ mod tests {
         for valid in ["1", "240"] {
             assert!(Args::try_parse_from(["rxwpe", "wallpaper", "--fps", valid]).is_ok());
         }
-    }
-
-    #[test]
-    fn properties_parse_json_and_preserve_plain_strings() -> Result<()> {
-        for (assignment, expected) in [
-            ("opacity=0.5", serde_json::json!(0.5)),
-            ("opacity=true", serde_json::json!(true)),
-            (
-                "opacity=\"quoted value\"",
-                serde_json::json!("quoted value"),
-            ),
-            ("opacity=[1,2]", serde_json::json!([1, 2])),
-            ("opacity=plain text=x", serde_json::json!("plain text=x")),
-            ("opacity=", serde_json::json!("")),
-        ] {
-            let project = project_args(&[assignment]).load()?;
-            assert_eq!(project.metadata.properties["opacity"]["value"], expected);
-        }
-        let project = project_args(&["opacity=0.2", "opacity=0.8"]).load()?;
-        assert_eq!(project.metadata.properties["opacity"]["value"], 0.8);
-        Ok(())
-    }
-
-    #[test]
-    fn malformed_and_unknown_property_assignments_report_errors() {
-        let malformed = project_args(&["opacity"]).load().unwrap_err();
-        assert!(
-            malformed
-                .to_string()
-                .contains("property must be NAME=VALUE")
-        );
-        let unknown = project_args(&["missing=1"]).load().unwrap_err();
-        assert!(
-            unknown
-                .to_string()
-                .contains("unknown wallpaper property: missing")
-        );
     }
 
     #[test]

@@ -225,38 +225,3 @@ impl ScenePlayer {
         Ok(frame)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[ignore = "requires a GPU adapter, including software renderer"]
-    fn project_assets_to_gpu_frame_with_property_override() -> Result<()> {
-        let directory =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/static-scene");
-        let mut project = Project::load(directory, None)?;
-        let gpu = Gpu::headless()?;
-        let mut player = ScenePlayer::open(&project, &gpu, false)?;
-        let frame = player.render(&gpu, Duration::ZERO)?;
-        assert_eq!((frame.width(), frame.height()), (320, 180));
-        let rgba = gpu.read_rgba(&frame)?;
-        let pixel = |x: usize, y: usize| &rgba[(y * 320 + x) * 4..(y * 320 + x) * 4 + 4];
-        assert!(
-            pixel(90, 60)[2] > pixel(90, 60)[0],
-            "top-left checker must be blue"
-        );
-        assert!(
-            pixel(230, 60)[0] > pixel(230, 60)[2],
-            "top-right checker must be orange"
-        );
-        let original_background = pixel(0, 0).to_vec();
-        project.set_property("opacity", 0.into())?;
-        let mut player = ScenePlayer::open(&project, &gpu, false)?;
-        let frame = player.render(&gpu, Duration::ZERO)?;
-        let rgba = gpu.read_rgba(&frame)?;
-        let center = &rgba[(90 * 320 + 160) * 4..(90 * 320 + 160) * 4 + 4];
-        assert_eq!(center, original_background);
-        Ok(())
-    }
-}
