@@ -215,10 +215,7 @@ impl ScenePlayer {
             .collect();
         for system in &mut self.particles {
             system.advance(elapsed);
-            ordered.push((
-                system.definition.order,
-                system.layers(&self.document.camera),
-            ));
+            ordered.push((system.order(), system.layers(&self.document.camera)));
         }
         ordered.sort_by_key(|(order, _)| *order);
         let layers: Vec<Layer> = ordered.into_iter().flat_map(|(_, layers)| layers).collect();
@@ -243,7 +240,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "requires a GPU adapter, including software Vulkan"]
+    #[ignore = "requires a GPU adapter, including software renderer"]
     fn project_assets_to_gpu_frame_with_property_override() -> Result<()> {
         let directory =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/static-scene");

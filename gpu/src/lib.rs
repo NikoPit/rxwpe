@@ -512,7 +512,7 @@ fn quad_vertices(layer: &Layer, width: u32, height: u32) -> [Vertex; 6] {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "requires a GPU adapter, including software Vulkan"]
+    #[ignore = "requires a GPU adapter, including software renderer"]
     fn offscreen_composition_preserves_orientation_and_alpha() -> Result<()> {
         let gpu = Gpu::headless()?;
         let image = gpu.upload_rgba(

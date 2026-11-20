@@ -18,9 +18,13 @@ struct Particle {
 }
 
 pub(super) struct ParticleSystem {
-    pub definition: ParticleLayer,
+    simulation: ParticleSimulation,
     image: Arc<GpuImage>,
     frames: Vec<TextureFrame>,
+}
+
+struct ParticleSimulation {
+    definition: ParticleLayer,
     particles: Vec<Particle>,
     timers: Vec<f64>,
     tick: u64,
@@ -29,12 +33,28 @@ pub(super) struct ParticleSystem {
 
 impl ParticleSystem {
     pub fn new(definition: ParticleLayer, image: Arc<GpuImage>, frames: Vec<TextureFrame>) -> Self {
+        Self {
+            simulation: ParticleSimulation::new(definition),
+            image,
+            frames,
+        }
+    }
+
+    pub fn order(&self) -> usize {
+        self.simulation.definition.order
+    }
+
+    pub fn advance(&mut self, elapsed: Duration) {
+        self.simulation.advance(elapsed);
+    }
+}
+
+impl ParticleSimulation {
+    fn new(definition: ParticleLayer) -> Self {
         let timers = vec![0.; definition.emitters.len()];
         let rng = definition.id as u64 ^ 0x9e3779b97f4a7c15;
         Self {
             definition,
-            image,
-            frames,
             particles: Vec::new(),
             timers,
             tick: 0,
@@ -189,29 +209,35 @@ impl ParticleSystem {
     fn between(&mut self, range: [f32; 2]) -> f32 {
         range[0] + self.random() * (range[1] - range[0])
     }
+}
 
+impl ParticleSystem {
     pub fn layers(&self, camera: &SceneCamera) -> Vec<Layer> {
-        self.particles
+        self.simulation
+            .particles
             .iter()
             .map(|p| {
-                let alpha = self
-                    .definition
-                    .operators
-                    .iter()
-                    .fold(p.alpha, |alpha, op| match op {
+                let alpha = self.simulation.definition.operators.iter().fold(
+                    p.alpha,
+                    |alpha, op| match op {
                         Operator::AlphaFade { fade_in, fade_out } => {
                             alpha * fade(p.age / p.lifetime, *fade_in, *fade_out)
                         }
                         _ => alpha,
-                    });
+                    },
+                );
                 let center = p.position;
                 let corners = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]].map(|point| {
                     let point = rotate([point[0] * p.size, point[1] * p.size, 0.], p.rotation);
-                    let point =
-                        std::array::from_fn(|i| (point[i] + center[i]) * self.definition.scale[i]);
-                    let point = rotate(point, self.definition.angles.map(f32::to_radians));
+                    let point = std::array::from_fn(|i| {
+                        (point[i] + center[i]) * self.simulation.definition.scale[i]
+                    });
+                    let point = rotate(
+                        point,
+                        self.simulation.definition.angles.map(f32::to_radians),
+                    );
                     camera.project(std::array::from_fn(|i| {
-                        point[i] + self.definition.origin[i]
+                        point[i] + self.simulation.definition.origin[i]
                     }))
                 });
                 Layer {
@@ -221,7 +247,7 @@ impl ParticleSystem {
                     rotation: 0.,
                     corners: Some(corners),
                     color: [p.color[0], p.color[1], p.color[2], alpha.clamp(0., 1.)],
-                    blend: match self.definition.blending {
+                    blend: match self.simulation.definition.blending {
                         BlendMode::Additive => Blend::Additive,
                         BlendMode::Opaque | BlendMode::Normal => Blend::Replace,
                         BlendMode::Translucent => Blend::Alpha,
@@ -237,10 +263,10 @@ impl ParticleSystem {
         if duration <= 0. {
             return [0., 0., 1., 1.];
         }
-        let time = if self.definition.animation_mode == "lifetime" {
+        let time = if self.simulation.definition.animation_mode == "lifetime" {
             p.age / p.lifetime * duration
         } else {
-            p.age * self.definition.sequence_multiplier
+            p.age * self.simulation.definition.sequence_multiplier
         };
         let mut time = time.rem_euclid(duration);
         for frame in &self.frames {
@@ -278,6 +304,148 @@ pub(super) fn rotate(mut point: [f32; 3], angles: [f32; 3]) -> [f32; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rxwpe_parser::Emitter;
+
+    fn definition() -> ParticleLayer {
+        ParticleLayer {
+            id: 42,
+            order: 0,
+            origin: [0.; 3],
+            scale: [1.; 3],
+            angles: [0.; 3],
+            visible: true,
+            alpha: 1.,
+            color: [1.; 3],
+            size: 1.,
+            lifetime: 10.,
+            rate: 1.,
+            max_count: 100,
+            start_time: 0.,
+            texture: String::new(),
+            blending: BlendMode::Translucent,
+            animation_mode: "sequence".into(),
+            sequence_multiplier: 1.,
+            emitters: vec![Emitter {
+                sphere: false,
+                directions: [1.; 3],
+                min: [0.; 3],
+                max: [10.; 3],
+                origin: [0.; 3],
+                rate: 60.,
+                instantaneous: 0,
+                speed: [1., 5.],
+                sign: [0.; 3],
+            }],
+            initializers: vec![Initializer::Lifetime([0.5, 1.])],
+            operators: vec![Operator::Movement {
+                gravity: [0., -9.8, 0.],
+                drag: 0.1,
+            }],
+        }
+    }
+
+    #[test]
+    fn fractional_emission_accumulates_and_applies_rate_multiplier() {
+        let mut definition = definition();
+        definition.emitters[0].rate = 15.;
+        definition.rate = 0.5;
+        let mut simulation = ParticleSimulation::new(definition);
+        simulation.advance(Duration::from_secs(2));
+        assert_eq!(simulation.particles.len(), 15);
+        let particles = simulation.particles.clone();
+        simulation.advance(Duration::from_secs(2));
+        assert_eq!(simulation.particles, particles);
+    }
+
+    #[test]
+    fn all_emitters_share_the_particle_limit() {
+        let mut definition = definition();
+        definition.max_count = 7;
+        definition.emitters[0].instantaneous = 5;
+        definition.emitters.push(definition.emitters[0].clone());
+        let mut simulation = ParticleSimulation::new(definition);
+        simulation.advance(Duration::from_millis(17));
+        assert_eq!(simulation.particles.len(), 7);
+        simulation.advance(Duration::from_secs(1));
+        assert_eq!(simulation.particles.len(), 7);
+    }
+
+    #[test]
+    fn burst_emits_once_and_particles_expire_at_their_lifetime() {
+        let mut definition = definition();
+        definition.emitters[0].rate = 0.;
+        definition.emitters[0].instantaneous = 3;
+        definition.initializers.clear();
+        definition.lifetime = 2. * STEP as f32;
+        let mut simulation = ParticleSimulation::new(definition);
+        simulation.advance(Duration::ZERO);
+        assert!(simulation.particles.is_empty());
+        simulation.advance(Duration::from_millis(17));
+        assert_eq!(simulation.particles.len(), 3);
+        simulation.advance(Duration::from_millis(34));
+        assert_eq!(simulation.particles.len(), 3);
+        simulation.advance(Duration::from_millis(50));
+        assert!(simulation.particles.is_empty());
+        simulation.advance(Duration::from_secs(1));
+        assert!(simulation.particles.is_empty());
+    }
+
+    #[test]
+    fn fixed_steps_produce_identical_particles_at_different_render_rates() {
+        let mut direct = ParticleSimulation::new(definition());
+        let mut incremental = ParticleSimulation::new(definition());
+        direct.advance(Duration::from_secs(2));
+        for milliseconds in (10..=2000).step_by(10) {
+            incremental.advance(Duration::from_millis(milliseconds));
+        }
+        assert!(!direct.particles.is_empty());
+        assert_eq!(direct.particles, incremental.particles);
+    }
+
+    #[test]
+    fn rewinding_replays_the_same_random_particles() {
+        let mut simulation = ParticleSimulation::new(definition());
+        simulation.advance(Duration::from_secs(1));
+        let expected = simulation.particles.clone();
+        simulation.advance(Duration::from_secs(2));
+        simulation.advance(Duration::from_secs(1));
+        assert_eq!(simulation.particles, expected);
+        simulation.advance(Duration::ZERO);
+        assert!(simulation.particles.is_empty());
+        simulation.advance(Duration::from_secs(1));
+        assert_eq!(simulation.particles, expected);
+    }
+
+    #[test]
+    fn long_pause_rebuilds_only_the_bounded_warmup() {
+        let mut definition = definition();
+        definition.max_count = 10_000;
+        definition.lifetime = 1_000_000.;
+        definition.initializers.clear();
+        let mut direct = ParticleSimulation::new(definition.clone());
+        let mut previously_playing = ParticleSimulation::new(definition);
+        previously_playing.advance(Duration::from_secs(1));
+        direct.advance(Duration::from_secs(3600));
+        previously_playing.advance(Duration::from_secs(3600));
+        assert_eq!(direct.particles.len(), 7200);
+        assert!(direct.particles.iter().all(|p| p.age < 121.));
+        assert_eq!(direct.particles, previously_playing.particles);
+        let particles = direct.particles.clone();
+        direct.advance(Duration::from_secs(3600));
+        assert_eq!(direct.particles, particles);
+    }
+
+    #[test]
+    fn start_time_warms_up_the_simulation() {
+        let mut definition = definition();
+        definition.start_time = 1.;
+        let mut warmed = ParticleSimulation::new(definition);
+        let mut regular = ParticleSimulation::new(self::definition());
+        warmed.advance(Duration::ZERO);
+        regular.advance(Duration::from_secs(1));
+        assert_eq!(warmed.particles, regular.particles);
+    }
+
     #[test]
     fn particle_alpha_fades_over_normalized_lifetime() {
         for (life, expected) in [(0., 0.), (0.25, 0.5), (0.5, 1.), (0.75, 0.5), (1., 0.)] {

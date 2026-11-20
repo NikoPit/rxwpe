@@ -44,6 +44,12 @@
 
       formatter = eachSystem (system: nixpkgs.legacyPackages.${system}.nixfmt-tree);
 
+      checks = eachSystem (system: {
+        configuration = import ./nix/tests.nix {
+          pkgs = nixpkgs.legacyPackages.${system};
+        };
+      });
+
       homeManagerModules = {
         default = ./nix/home-manager.nix;
       };

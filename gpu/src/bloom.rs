@@ -191,7 +191,7 @@ mod tests {
     use crate::Layer;
 
     #[test]
-    #[ignore = "requires a GPU adapter, including software Vulkan"]
+    #[ignore = "requires a GPU adapter, including software renderer"]
     fn bloom_spreads_bright_pixels_and_respects_threshold_and_strength() -> Result<()> {
         let gpu = Gpu::headless()?;
         let mut pixels = vec![0; 64 * 64 * 4];

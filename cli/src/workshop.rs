@@ -72,12 +72,76 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new() -> Result<Self> {
+            let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+            let directory =
+                std::env::temp_dir().join(format!("rxwpe-steam-{}-{unique}", std::process::id()));
+            std::fs::create_dir_all(&directory)?;
+            Ok(Self(directory))
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn first_matching_library_wins_for_workshop_and_shared_assets() -> Result<()> {
+        let directory = TempDir::new()?;
+        let first = directory.0.join("first library");
+        let second = directory.0.join("second library");
+        for library in [&first, &second] {
+            std::fs::create_dir_all(library.join("steamapps/workshop/content/431960/123456"))?;
+            std::fs::create_dir_all(library.join("steamapps/common/wallpaper_engine/assets"))?;
+        }
+        let missing = directory.0.join("missing");
+        for (libraries, expected) in [
+            (vec![missing.clone(), first.clone(), second.clone()], &first),
+            (vec![missing, second.clone(), first.clone()], &second),
+        ] {
+            assert_eq!(
+                resolve("123456", &libraries)?,
+                expected.join("steamapps/workshop/content/431960/123456")
+            );
+            assert_eq!(
+                shared_assets(&libraries),
+                Some(expected.join("steamapps/common/wallpaper_engine/assets"))
+            );
+        }
+        let libraries = libraries(&[second.clone(), first.clone()]);
+        assert_eq!(&libraries[..2], &[second, first]);
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_directories_win_and_missing_items_report_useful_errors() -> Result<()> {
+        let directory = TempDir::new()?;
+        let local = directory.0.join("123456");
+        let library = directory.0.join("Steam");
+        std::fs::create_dir_all(&local)?;
+        std::fs::create_dir_all(library.join("steamapps/workshop/content/431960/123456"))?;
+        assert_eq!(resolve(local.to_str().unwrap(), &[library.clone()])?, local);
+        let error = resolve("987654", &[library.clone()])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("Workshop item 987654 is not installed"));
+        let error = resolve("missing-wallpaper", &[library.clone()])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("wallpaper directory does not exist"));
+        assert!(shared_assets(&[library]).is_none());
+        Ok(())
+    }
+
     #[test]
     fn resolves_workshop_and_shared_assets_in_macos_steam() -> Result<()> {
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let home =
-            std::env::temp_dir().join(format!("rxwpe-steam-{}-{unique}", std::process::id()));
-        let root = home.join("Library/Application Support/Steam");
+        let directory = TempDir::new()?;
+        let root = directory.0.join("Library/Application Support/Steam");
         let wallpaper = root.join("steamapps/workshop/content/431960/123456");
         let assets = root.join("steamapps/common/wallpaper_engine/assets");
         std::fs::create_dir_all(&wallpaper)?;
@@ -86,7 +150,6 @@ mod tests {
         let resolved = resolve("123456", &libraries);
         let found_assets = shared_assets(&libraries);
         let direct_steamapps = resolve("123456", &[root.join("steamapps")]);
-        std::fs::remove_dir_all(&home)?;
         assert_eq!(resolved?, wallpaper);
         assert_eq!(direct_steamapps?, wallpaper);
         assert_eq!(found_assets, Some(assets));
