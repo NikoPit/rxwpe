@@ -82,7 +82,9 @@ impl Layer {
 
 impl Gpu {
     pub fn headless() -> Result<Arc<Self>> {
-        let instance = Arc::new(wgpu::Instance::new(&wgpu::InstanceDescriptor::default()));
+        let instance = Arc::new(wgpu::Instance::new(
+            &wgpu::InstanceDescriptor::from_env_or_default(),
+        ));
         pollster::block_on(Self::from_instance(instance, None))
     }
 

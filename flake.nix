@@ -36,9 +36,23 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          default = pkgs.callPackage ./nix/dev-shell.nix { };
         in
         {
-          default = pkgs.callPackage ./nix/dev-shell.nix { };
+          inherit default;
+        }
+        // nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          # CI tests only: force software OpenGL so rendering tests need no GPU.
+          # Use the default shell for development with hardware acceleration.
+          ci = pkgs.mkShell {
+            inputsFrom = [ default ];
+            inherit (default) LD_LIBRARY_PATH;
+            # Use Mesa from the same nixpkgs as the shell's GL loader.
+            LIBGL_ALWAYS_SOFTWARE = "1";
+            LIBGL_DRIVERS_PATH = "${pkgs.mesa}/lib/dri";
+            __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
+            WGPU_BACKEND = "gl";
+          };
         }
       );
 

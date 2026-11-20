@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -32,8 +32,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      LIBGL_ALWAYS_SOFTWARE: "1"
-      WGPU_BACKEND: gl
       XDG_RUNTIME_DIR: /tmp/rxwpe-runtime
     steps:
       - uses: actions/checkout@v4
@@ -41,11 +39,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: linux-rendering
-      - name: Install software OpenGL
+      - name: Prepare runtime directory
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dri
           mkdir -p "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
       - name: Test rendering and video playback with software OpenGL
-        run: nix develop -c cargo test --workspace --locked -- --ignored
+        # The ci shell forces software rendering for CI tests only.
+        run: nix develop .#ci -c cargo test --workspace --locked -- --ignored
