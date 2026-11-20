@@ -23,8 +23,6 @@ rustPlatform.buildRustPackage {
       ]);
   };
   cargoLock.lockFile = ../Cargo.lock;
-  cargoBuildFlags = [ "--workspace" ];
-  cargoTestFlags = [ "--workspace" ];
   nativeBuildInputs = [
     pkg-config
     makeWrapper

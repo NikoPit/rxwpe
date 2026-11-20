@@ -1604,111 +1604,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
-name = "rxwpe-assets"
-version = "0.1.0"
-dependencies = [
- "anyhow",
-]
-
-[[package]]
-name = "rxwpe-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "rxwpe-gpu",
- "rxwpe-output",
- "rxwpe-parser",
- "rxwpe-scene",
- "rxwpe-video",
- "rxwpe-web",
- "serde_json",
-]
-
-[[package]]
-name = "rxwpe-gpu"
+name = "rxwpe"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytemuck",
+ "clap",
  "image",
- "pollster",
- "wgpu",
-]
-
-[[package]]
-name = "rxwpe-media"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rxwpe-output"
-version = "0.1.0"
-dependencies = [
- "anyhow",
+ "lz4_flex",
  "objc2",
  "objc2-app-kit",
  "pollster",
  "raw-window-handle",
- "rxwpe-gpu",
+ "serde",
+ "serde_json",
  "smithay-client-toolkit",
  "wayland-backend",
  "wayland-client",
  "wgpu",
  "winit",
-]
-
-[[package]]
-name = "rxwpe-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "image",
- "lz4_flex",
- "rxwpe-assets",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rxwpe-scene"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rxwpe-assets",
- "rxwpe-gpu",
- "rxwpe-media",
- "rxwpe-parser",
-]
-
-[[package]]
-name = "rxwpe-shader"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rxwpe-assets",
- "serde_json",
-]
-
-[[package]]
-name = "rxwpe-video"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rxwpe-gpu",
- "rxwpe-media",
-]
-
-[[package]]
-name = "rxwpe-web"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rxwpe-parser",
 ]
 
 [[package]]

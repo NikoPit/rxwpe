@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  workspace:
+  tests:
     strategy:
       fail-fast: false
       matrix:
@@ -20,13 +20,13 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ runner.os }}-workspace
-      - name: Test workspace with FFmpeg
-        run: nix develop -c cargo test --workspace --locked
+          key: ${{ runner.os }}-rxwpe
+      - name: Test with FFmpeg
+        run: nix develop -c cargo test --locked
       - name: Test Nix configuration
         run: nix build .#checks.$(nix eval --impure --raw --expr builtins.currentSystem).configuration --no-link
       - name: Check Rust formatting
-        run: nix develop -c cargo fmt --all -- --check
+        run: nix develop -c cargo fmt -- --check
 
   rendering:
     runs-on: ubuntu-24.04
@@ -45,4 +45,4 @@ jobs:
           chmod 700 "$XDG_RUNTIME_DIR"
       - name: Test rendering and video playback with software OpenGL
         # The ci shell forces software rendering for CI tests only.
-        run: nix develop .#ci -c cargo test --workspace --locked -- --ignored
+        run: nix develop .#ci -c cargo test --locked -- --ignored

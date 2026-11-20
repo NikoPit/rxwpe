@@ -12,7 +12,7 @@ Play Wallpaper Engine wallpapers on Linux and macOS.
 Install Rust and FFmpeg with `ffplay`, then run this from the repository directory to install rxwpe:
 
 ```sh
-cargo install --path cli --locked
+cargo install --path . --locked
 ```
 
 On macOS, follow [macOS wallpaper setup](docs/usage.md#macos-wallpaper-setup) to prepare your files and play them by directory path.
