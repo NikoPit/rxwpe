@@ -110,6 +110,13 @@ rxwpe /path/to/wallpaper --scale fit --fps 60
 
 `fit` keeps the entire image visible and may leave borders. `fill` fills the display and may crop the image. `stretch` fills the display without keeping the image's aspect ratio.
 
+To inspect all of the properties in a wallpaper, use its directory or numeric Workshop ID:
+
+```sh
+rxwpe /path/to/wallpaper --list-properties
+rxwpe 123456789 --list-properties
+```
+
 Override a property defined by the wallpaper with `--property NAME=VALUE`. Values accept JSON or plain strings. Repeat the option for multiple properties:
 
 ```sh
