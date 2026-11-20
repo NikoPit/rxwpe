@@ -267,24 +267,35 @@ impl ParticleSystem {
     }
 
     fn uv(&self, p: &Particle) -> [f32; 4] {
-        let duration: f32 = self.frames.iter().map(|f| f.duration).sum();
-        if duration <= 0. {
-            return [0., 0., 1., 1.];
-        }
-        let time = if self.simulation.definition.animation_mode == "lifetime" {
-            p.age / p.lifetime * duration
-        } else {
-            p.age * self.simulation.definition.sequence_multiplier
-        };
-        let mut time = time.rem_euclid(duration);
-        for frame in &self.frames {
-            if time < frame.duration {
-                return frame.uv;
-            }
-            time -= frame.duration;
-        }
-        self.frames.last().unwrap().uv
+        particle_uv(
+            &self.frames,
+            p.age,
+            p.lifetime,
+            self.simulation.definition.sequence_multiplier,
+        )
     }
+}
+
+fn particle_uv(
+    frames: &[TextureFrame],
+    age: f32,
+    lifetime: f32,
+    sequence_multiplier: f32,
+) -> [f32; 4] {
+    let duration: f32 = frames.iter().map(|f| f.duration).sum();
+    if duration <= 0. {
+        return [0., 0., 1., 1.];
+    }
+    // Wallpaper Engine feeds normalized particle age to the sprite shader.
+    // The sequence multiplier counts animation cycles over that lifetime.
+    let mut time = (age / lifetime * sequence_multiplier).rem_euclid(1.) * duration;
+    for frame in frames {
+        if time < frame.duration {
+            return frame.uv;
+        }
+        time -= frame.duration;
+    }
+    frames.last().unwrap().uv
 }
 
 fn fade(life: f32, fade_in: f32, fade_out: f32) -> f32 {
@@ -459,5 +470,30 @@ mod tests {
         for (life, expected) in [(0., 0.), (0.25, 0.5), (0.5, 1.), (0.75, 0.5), (1., 0.)] {
             assert!((fade(life, 0.5, 0.5) - expected).abs() < 1e-6);
         }
+    }
+
+    #[test]
+    fn fog_sequence_spans_each_particles_lifetime() {
+        // The configured fog atlas has 64 frames totaling one second, while
+        // its particles live for three to five seconds.
+        let frames: Vec<_> = (0..64)
+            .map(|i| TextureFrame {
+                uv: [i as f32 / 64., 0., (i + 1) as f32 / 64., 1.],
+                duration: 1. / 64.,
+            })
+            .collect();
+        for lifetime in [3., 4., 5.] {
+            for (fraction, index) in [(0., 0), (0.25, 16), (0.5, 32), (0.75, 48)] {
+                assert_eq!(
+                    particle_uv(&frames, lifetime * fraction, lifetime, 1.),
+                    frames[index].uv,
+                );
+            }
+        }
+        assert_eq!(particle_uv(&frames, 1.5, 4., 2.), frames[48].uv);
+        assert_eq!(particle_uv(&frames, 2., 4., 2.), frames[0].uv);
+        assert_eq!(particle_uv(&frames, 2., 4., 0.5), frames[16].uv);
+        assert_eq!(particle_uv(&frames, 2., 4., 0.), frames[0].uv);
+        assert_eq!(particle_uv(&[], 2., 4., 1.), [0., 0., 1., 1.]);
     }
 }
