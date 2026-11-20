@@ -9,11 +9,15 @@ Play Wallpaper Engine wallpapers on Linux and macOS.
 
 ## Get started
 
-Install Rust and FFmpeg with `ffplay`, then run this from the repository directory to install rxwpe:
+Install a current stable Rust toolchain and FFmpeg with `ffmpeg`, `ffprobe`, and `ffplay`, then install rxwpe from crates.io:
 
 ```sh
-cargo install --path cli --locked
+cargo install rxwpe --locked
 ```
+
+Make sure Cargo's binary directory, usually `~/.cargo/bin`, is on your `PATH`.
+Linux also needs a Vulkan or OpenGL driver, Wayland, and libxkbcommon at runtime.
+On NixOS, use the [Nix package](docs/nix.md#install-the-package) to supply the runtime libraries and FFmpeg.
 
 On macOS, follow [macOS wallpaper setup](docs/usage.md#macos-wallpaper-setup) to prepare your files and play them by directory path.
 
@@ -28,6 +32,12 @@ rxwpe 123456789
 To get the ID of a wallpaper, open the wallpaper's Steam Workshop page and copy the number after `?id=` in its URL. For example, `https://steamcommunity.com/sharedfiles/filedetails/?id=123456789` has the ID `123456789`.
 
 See [usage](docs/usage.md) for more options.
+
+To install a local checkout instead:
+
+```sh
+cargo install --path cli --locked
+```
 
 ## Declarative configuration with Nix
 

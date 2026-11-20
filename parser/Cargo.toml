@@ -2,6 +2,12 @@
 name = "rxwpe-parser"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+license-file.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Parsers for Wallpaper Engine project and scene formats"
 
 [dependencies]
 anyhow.workspace = true
@@ -9,4 +15,4 @@ serde.workspace = true
 serde_json.workspace = true
 image.workspace = true
 lz4_flex.workspace = true
-rxwpe-assets = { path = "../assets" }
+rxwpe-assets.workspace = true

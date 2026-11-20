@@ -3,6 +3,11 @@ name = "rxwpe-media"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+license-file.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "FFmpeg media decoding and audio playback for rxwpe"
 
 [dependencies]
 anyhow.workspace = true

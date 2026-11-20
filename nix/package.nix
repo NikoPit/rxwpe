@@ -35,6 +35,9 @@ rustPlatform.buildRustPackage {
       --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} ${lib.optionalString stdenv.hostPlatform.isLinux "--prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibraries}"}
   '';
   meta = {
+    description = "Play Wallpaper Engine wallpapers on Linux and macOS";
+    homepage = "https://github.com/NikoPit/rxwpe";
+    license = lib.licenses.mit;
     mainProgram = "rxwpe";
     platforms = [
       "x86_64-linux"

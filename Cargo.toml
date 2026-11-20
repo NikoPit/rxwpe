@@ -7,6 +7,10 @@ default-members = ["cli"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
+license = "MIT"
+license-file = "LICENSE"
+repository = "https://github.com/NikoPit/rxwpe"
+readme = "README.md"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -20,15 +24,15 @@ winit = { version = "0.30", default-features = false, features = ["rwh_06", "way
 raw-window-handle = "0.6"
 bytemuck = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
-rxwpe-assets = { path = "assets" }
-rxwpe-parser = { path = "parser" }
-rxwpe-scene = { path = "scene" }
-rxwpe-video = { path = "video" }
-rxwpe-web = { path = "web" }
-rxwpe-shader = { path = "shader" }
-rxwpe-media = { path = "media" }
-rxwpe-gpu = { path = "gpu" }
-rxwpe-output = { path = "output" }
+rxwpe-assets = { version = "0.1.0", path = "assets" }
+rxwpe-parser = { version = "0.1.0", path = "parser" }
+rxwpe-scene = { version = "0.1.0", path = "scene" }
+rxwpe-video = { version = "0.1.0", path = "video" }
+rxwpe-web = { version = "0.1.0", path = "web" }
+rxwpe-shader = { version = "0.1.0", path = "shader" }
+rxwpe-media = { version = "0.1.0", path = "media" }
+rxwpe-gpu = { version = "0.1.0", path = "gpu" }
+rxwpe-output = { version = "0.1.0", path = "output" }
 
 [profile.release]
 lto = "thin"

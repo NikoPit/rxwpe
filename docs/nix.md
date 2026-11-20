@@ -2,6 +2,35 @@
 
 The flake provides packages and a Home Manager module for Linux and Apple Silicon macOS. The module works with standalone Home Manager and Home Manager inside NixOS or nix-darwin.
 
+## Install the package
+
+The Nix package includes FFmpeg and wraps rxwpe with its graphics library paths.
+Use it on NixOS rather than a bare Cargo installation, which does not supply those runtime dependencies.
+
+To try rxwpe without installing it:
+
+```sh
+nix run github:NikoPit/rxwpe -- 123456789
+```
+
+To install it in your user profile:
+
+```sh
+nix profile install github:NikoPit/rxwpe
+```
+
+You can also use the package in a NixOS configuration after adding the flake input below:
+
+```nix
+{ inputs, pkgs, ... }:
+
+{
+  environment.systemPackages = [
+    inputs.rxwpe.packages.${pkgs.stdenv.hostPlatform.system}.default
+  ];
+}
+```
+
 ## Home Manager setup
 
 Add rxwpe to your flake inputs:
